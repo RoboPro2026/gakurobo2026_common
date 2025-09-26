@@ -1,0 +1,7 @@
+[submodule "ros2_socketcan"]
+	path = ros2_socketcan
+	url = https://github.com/autowarefoundation/ros2_socketcan.git
+	branch = humble
+[submodule "bno055"]
+	path = bno055
+	url = https://github.com/flynneva/bno055.git

@@ -1,0 +1,7 @@
+# Request
+# リセット要求（パラメータなし）
+
+---
+# Response
+bool success        # リセット処理の成功/失敗
+string message      # 処理結果のメッセージ 

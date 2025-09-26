@@ -1,0 +1,24 @@
+# Request
+uint8 motor_number     # モーター番号 (0-3)
+float32 dob_load_j     # DOBのイナーシャ
+float32 dob_load_d     # DOBの粘性摩擦
+float32 dob_cutoff_freq # DOBのカットオフ周波数
+float32 speed_gain_p   # 速度PIDのP gain
+float32 speed_gain_i   # 速度PIDのI gain  
+float32 speed_gain_d   # 速度PIDのD gain
+float32 torque_lim     # 速度PIDのトルク制限値
+float32 pos_gain_p     # 位置PIDのP gain
+float32 pos_gain_i     # 位置PIDのI gain
+float32 pos_gain_d     # 位置PIDのD gain
+float32 speed_lim      # 位置PIDの速度制限値
+int32 abs_turn_cnt     # アブソエンコーダの回転回数
+bool set_dob_param     # 外乱オブザーバーのパラメータを設定するか
+bool set_speed_gains   # 速度PIDゲインを設定するかどうか
+bool set_pos_gains     # 位置PIDゲインを設定するかどうか
+bool set_abs_turn_cnt  # アブソエンコーダの回転回数を設定するかどうか
+bool set_speed_limit     # v1との互換性を保つ用、v2では使用していない
+
+---
+# Response
+bool success
+string message 
