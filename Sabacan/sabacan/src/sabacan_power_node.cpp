@@ -6,9 +6,8 @@
 #include <thread>
 #include <type_traits>
 
-#include "rclcpp/rclcpp.hpp"
-
 #include "can_msgs/msg/frame.hpp"
+#include "rclcpp/rclcpp.hpp"
 #include "sabacan/sabacan.h"
 #include "sabacan_msgs/msg/sabacan_power_ref.hpp"
 #include "sabacan_msgs/srv/sabacan_reset.hpp"
@@ -23,16 +22,17 @@ public:
     can_driver_ = std::make_shared<CanDriver>();
     common_data_driver_ = std::make_unique<CommonDataDriver>(can_driver_);
     can_driver_->register_tx_callback(
-        [this](uint32_t id, uint8_t* data, uint8_t dlc, bool is_remote, bool is_ext)
-        { this->tx(id, data, dlc, is_remote, is_ext); });
+      [this](uint32_t id, uint8_t * data, uint8_t dlc, bool is_remote, bool is_ext) {
+        this->tx(id, data, dlc, is_remote, is_ext);
+      });
 
     // CANデータ送信用のPublisher
     can_publisher_ = this->create_publisher<can_msgs::msg::Frame>("/to_can_bus", 10);
 
     // 指令値を受け取るSubscriber
     sabacan_ref_subscription_ = this->create_subscription<sabacan_msgs::msg::SabacanPowerRef>(
-        "/sabacan_power_ref", 10,
-        std::bind(&SabacanPowerNode::sabacan_ref_callback, this, std::placeholders::_1));
+      "/sabacan_power_ref", 10,
+      std::bind(&SabacanPowerNode::sabacan_ref_callback, this, std::placeholders::_1));
 
     // 非常停止信号用
     // 非常停止信号はなんらかの理由があって読めなかったら嫌なので、一定周期で送る
@@ -52,7 +52,7 @@ public:
    * @param is_remote_frame
    * @param is_ext_id
    */
-  void tx(uint32_t id, uint8_t* data, uint8_t dlc, bool is_remote_frame, bool is_ext_id = true)
+  void tx(uint32_t id, uint8_t * data, uint8_t dlc, bool is_remote_frame, bool is_ext_id = true)
   {
     auto msg = std::make_unique<can_msgs::msg::Frame>();
     msg->header.stamp = this->get_clock()->now();
@@ -60,8 +60,7 @@ public:
     msg->is_extended = is_ext_id;
     msg->is_rtr = is_remote_frame;
     msg->dlc = dlc;
-    for (int i = 0; i < 8; i++)
-    {
+    for (int i = 0; i < 8; i++) {
       msg->data[i] = data[i];
     }
     RCLCPP_INFO(this->get_logger(), "Sending CAN frame: ID=0x%X", msg->id);
@@ -80,8 +79,9 @@ public:
       common_data_driver_->ems();
     else
       common_data_driver_->reset_ems();
-    RCLCPP_INFO(this->get_logger(), "Received Emergency signal: is_ems = %s",
-                is_ems_ == true ? "true" : "false");
+    RCLCPP_INFO(
+      this->get_logger(), "Received Emergency signal: is_ems = %s",
+      is_ems_ == true ? "true" : "false");
   }
 
   void timer_callback()
@@ -90,8 +90,8 @@ public:
       common_data_driver_->ems();
     else
       common_data_driver_->reset_ems();
-    RCLCPP_INFO(this->get_logger(), "Send Emergency signal: is_ems = %s",
-                is_ems_ ? "true" : "false");
+    RCLCPP_INFO(
+      this->get_logger(), "Send Emergency signal: is_ems = %s", is_ems_ ? "true" : "false");
   }
 
 private:
@@ -103,7 +103,7 @@ private:
   bool is_ems_;
 };
 
-int main(int argc, char* argv[])
+int main(int argc, char * argv[])
 {
   rclcpp::init(argc, argv);
   rclcpp::spin(std::make_shared<SabacanPowerNode>());

@@ -54,13 +54,14 @@ public:
   uint64_t monitor_reg1[N] = {0};
   uint64_t monitor_reg2[N] = {0};
 
-  RobomasDriverV2(std::shared_ptr<CanDriver> _can_driver, int _board_id) :
-      CanDevice(_can_driver, _board_id, DataType::ROBOMAS_V2)
+  RobomasDriverV2(std::shared_ptr<CanDriver> _can_driver, int _board_id)
+  : CanDevice(_can_driver, _board_id, DataType::ROBOMAS_V2)
   {
   }
 
-  void setControl(int n, uint8_t _control_mode, uint8_t _control_motor, bool _dob_en,
-                  bool _abs_enc_en, bool _md_guess_en)
+  void setControl(
+    int n, uint8_t _control_mode, uint8_t _control_motor, bool _dob_en, bool _abs_enc_en,
+    bool _md_guess_en)
   {
     uint8_t _control = 0;
     _control |= _control_mode & 0x03;
@@ -71,245 +72,174 @@ public:
     tx(((n & 0xF) << 8) | RobomasV2::CONTROL, _control);
   }
 
-  void setAbsGearRatio(int n, float val)
-  {
-    tx((n & 0xF) << 8 | RobomasV2::ABS_GEAR_RATIO, val);
-  }
+  void setAbsGearRatio(int n, float val) { tx((n & 0xF) << 8 | RobomasV2::ABS_GEAR_RATIO, val); }
 
   /**
    * @brief キャリブレーションのリクエスト
    *
    */
-  void setCalRq(int n, bool val)
-  {
-    tx((n & 0xF) << 8 | RobomasV2::CAL_RQ, val);
-  }
+  void setCalRq(int n, bool val) { tx((n & 0xF) << 8 | RobomasV2::CAL_RQ, val); }
 
-  void setLoad_J(int n, float val)
-  {
-    tx((n & 0xF) << 8 | RobomasV2::LOAD_J, val);
-  }
+  void setLoad_J(int n, float val) { tx((n & 0xF) << 8 | RobomasV2::LOAD_J, val); }
 
-  void setLoad_D(int n, float val)
-  {
-    tx((n & 0xF) << 8 | RobomasV2::LOAD_D, val);
-  }
+  void setLoad_D(int n, float val) { tx((n & 0xF) << 8 | RobomasV2::LOAD_D, val); }
 
   /**
    * @brief 外乱オブザーバーのカットオフ周波数
    *
    */
-  void setDob_CF(int n, float val)
-  {
-    tx((n & 0xF) << 8 | RobomasV2::DOB_CF, val);
-  }
+  void setDob_CF(int n, float val) { tx((n & 0xF) << 8 | RobomasV2::DOB_CF, val); }
 
-  void setCanTimeout(uint16_t val)
-  {
-    tx(RobomasV2::CAN_TIMEOUT, val);
-  }
+  void setCanTimeout(uint16_t val) { tx(RobomasV2::CAN_TIMEOUT, val); }
 
-  void setTorqueTarget(int n, float val)
-  {
-    tx((n & 0xF) << 8 | RobomasV2::TRQ_TARGET, val);
-  }
+  void setTorqueTarget(int n, float val) { tx((n & 0xF) << 8 | RobomasV2::TRQ_TARGET, val); }
 
-  void setSpeedTarget(int n, float val)
-  {
-    tx((n & 0xF) << 8 | RobomasV2::SPD_TARGET, val);
-  }
+  void setSpeedTarget(int n, float val) { tx((n & 0xF) << 8 | RobomasV2::SPD_TARGET, val); }
 
-  void setTorqueLimit(int n, float val)
-  {
-    tx((n & 0xF) << 8 | RobomasV2::TRQ_LIM, val);
-  }
+  void setTorqueLimit(int n, float val) { tx((n & 0xF) << 8 | RobomasV2::TRQ_LIM, val); }
 
-  void setSpeedGainP(int n, float val)
-  {
-    tx((n & 0xF) << 8 | RobomasV2::SPD_GAIN_P, val);
-  }
+  void setSpeedGainP(int n, float val) { tx((n & 0xF) << 8 | RobomasV2::SPD_GAIN_P, val); }
 
-  void setSpeedGainI(int n, float val)
-  {
-    tx((n & 0xF) << 8 | RobomasV2::SPD_GAIN_I, val);
-  }
+  void setSpeedGainI(int n, float val) { tx((n & 0xF) << 8 | RobomasV2::SPD_GAIN_I, val); }
 
-  void setSpeedGainD(int n, float val)
-  {
-    tx((n & 0xF) << 8 | RobomasV2::SPD_GAIN_D, val);
-  }
+  void setSpeedGainD(int n, float val) { tx((n & 0xF) << 8 | RobomasV2::SPD_GAIN_D, val); }
 
-  void setPosTarget(int n, float val)
-  {
-    tx((n & 0xF) << 8 | RobomasV2::POS_TARGET, val);
-  }
+  void setPosTarget(int n, float val) { tx((n & 0xF) << 8 | RobomasV2::POS_TARGET, val); }
 
-  void setSpeedLim(int n, float val)
-  {
-    tx((n & 0xF) << 8 | RobomasV2::SPD_LIM, val);
-  }
+  void setSpeedLim(int n, float val) { tx((n & 0xF) << 8 | RobomasV2::SPD_LIM, val); }
 
-  void setPosGainP(int n, float val)
-  {
-    tx((n & 0xF) << 8 | RobomasV2::POS_GAIN_P, val);
-  }
+  void setPosGainP(int n, float val) { tx((n & 0xF) << 8 | RobomasV2::POS_GAIN_P, val); }
 
-  void setPosGainI(int n, float val)
-  {
-    tx((n & 0xF) << 8 | RobomasV2::POS_GAIN_I, val);
-  }
+  void setPosGainI(int n, float val) { tx((n & 0xF) << 8 | RobomasV2::POS_GAIN_I, val); }
 
-  void setPosGainD(int n, float val)
-  {
-    tx((n & 0xF) << 8 | RobomasV2::POS_GAIN_D, val);
-  }
+  void setPosGainD(int n, float val) { tx((n & 0xF) << 8 | RobomasV2::POS_GAIN_D, val); }
 
-  void setAbsTurnCnt(int n, int32_t val)
-  {
-    tx((n & 0xF) << 8 | RobomasV2::ABS_TURN_CNT, val);
-  }
+  void setAbsTurnCnt(int n, int32_t val) { tx((n & 0xF) << 8 | RobomasV2::ABS_TURN_CNT, val); }
 
-  void setVescMode(int n, uint8_t val)
-  {
-    tx((n & 0xF) << 8 | RobomasV2::VESC_MODE, val);
-  }
+  void setVescMode(int n, uint8_t val) { tx((n & 0xF) << 8 | RobomasV2::VESC_MODE, val); }
 
-  void setVescTarget(int n, float val)
-  {
-    tx((n & 0xF) << 8 | RobomasV2::VESC_TARGET, val);
-  }
+  void setVescTarget(int n, float val) { tx((n & 0xF) << 8 | RobomasV2::VESC_TARGET, val); }
 
-  void setMonitorPeriod(uint16_t val)
-  {
-    tx(RobomasV2::MONITOR_PERIOD, val);
-  }
+  void setMonitorPeriod(uint16_t val) { tx(RobomasV2::MONITOR_PERIOD, val); }
 
-  void setMonitorReg1(int n, uint64_t val)
-  {
-    tx((n & 0xF) << 8 | RobomasV2::MONITOR_REG1, val);
-  }
+  void setMonitorReg1(int n, uint64_t val) { tx((n & 0xF) << 8 | RobomasV2::MONITOR_REG1, val); }
 
-  void setMonitorReg2(int n, uint64_t val)
-  {
-    tx((n & 0xF) << 8 | RobomasV2::MONITOR_REG2, val);
-  }
+  void setMonitorReg2(int n, uint64_t val) { tx((n & 0xF) << 8 | RobomasV2::MONITOR_REG2, val); }
 
   bool receive(CanFrame frame)
   {
     int id = frame.register_id & 0xff;
     int n = (frame.register_id & 0xf00) >> 8;
-    if (!(0 <= n && n < N))
-    {
+    if (!(0 <= n && n < N)) {
       return false;
     }
-    switch (id)
-    {
-    case RobomasV2::MOTOR_STATE:
-      assign(&motor_state[n], frame.data);
-      break;
-    case RobomasV2::CONTROL:
-      assign(&control[n], frame.data);
-      control_mode[n] = control[n] & 0x03;
-      control_motor[n] = (control[n] >> 2) & 0x03;
-      dob_en[n] = (control[n] >> 4) & 0x01;
-      abs_enc_en[n] = (control[n] >> 5) & 0x01;
-      md_guess_en[n] = (control[n] >> 6) & 0x01;
-      break;
-    case RobomasV2::ABS_GEAR_RATIO:
-      assign(&abs_gear_ratio[n], frame.data);
-      break;
-    case RobomasV2::CAL_RQ:
-      assign(&cal_rq[n], frame.data);
-      break;
-    case RobomasV2::LOAD_J:
-      assign(&load_j[n], frame.data);
-      break;
-    case RobomasV2::LOAD_D:
-      assign(&load_d[n], frame.data);
-      break;
-    case RobomasV2::DOB_CF:
-      assign(&dob_cutoff_freq[n], frame.data);
-      break;
-    case RobomasV2::CAN_TIMEOUT:
-      assign(&can_timeout, frame.data);
-      break;
-    case RobomasV2::TRQ:
-      assign(&current_torque[n], frame.data);
-      break;
-    case RobomasV2::TRQ_TARGET:
-      assign(&trq_target[n], frame.data);
-      break;
-    case RobomasV2::SPD:
-      assign(&current_speed[n], frame.data);
-      break;
-    case RobomasV2::SPD_TARGET:
-      assign(&speed_target[n], frame.data);
-      break;
-    case RobomasV2::TRQ_LIM:
-      assign(&torque_lim[n], frame.data);
-      break;
-    case RobomasV2::SPD_GAIN_P:
-      assign(&speed_gain_p[n], frame.data);
-      break;
-    case RobomasV2::SPD_GAIN_I:
-      assign(&speed_gain_i[n], frame.data);
-      break;
-    case RobomasV2::SPD_GAIN_D:
-      assign(&speed_gain_d[n], frame.data);
-      break;
-    case RobomasV2::POS:
-      assign(&current_pos[n], frame.data);
-      break;
-    case RobomasV2::POS_TARGET:
-      assign(&pos_target[n], frame.data);
-      break;
-    case RobomasV2::SPD_LIM:
-      assign(&speed_lim[n], frame.data);
-      break;
-    case RobomasV2::POS_GAIN_P:
-      assign(&pos_gain_p[n], frame.data);
-      break;
-    case RobomasV2::POS_GAIN_I:
-      assign(&pos_gain_i[n], frame.data);
-      break;
-    case RobomasV2::POS_GAIN_D:
-      assign(&pos_gain_d[n], frame.data);
-      break;
-    case RobomasV2::ABS_POS:
-      assign(&abs_pos[n], frame.data);
-      break;
-    case RobomasV2::ABS_SPD:
-      assign(&abs_speed[n], frame.data);
-      break;
-    case RobomasV2::ABS_TURN_CNT:
-      assign(&abs_turn_cnt[n], frame.data);
-      break;
-    case RobomasV2::VESC_MODE:
-      assign(&vesc_mode[n], frame.data);
-      break;
-    case RobomasV2::VESC_TARGET:
-      assign(&vesc_target[n], frame.data);
-      break;
-    case RobomasV2::VESC_VOLTAGE:
-      assign(&vesc_voltage[n], frame.data);
-      break;
-    case RobomasV2::VESC_CURRENT:
-      assign(&vesc_current[n], frame.data);
-      break;
-    case RobomasV2::VESC_ERPM:
-      assign(&vesc_erpm[n], frame.data);
-      break;
-    case RobomasV2::MONITOR_PERIOD:
-      assign(&monitor_period, frame.data);
-      break;
-    case RobomasV2::MONITOR_REG1:
-      assign(&monitor_reg1[n], frame.data);
-      break;
-    case RobomasV2::MONITOR_REG2:
-      assign(&monitor_reg2[n], frame.data);
-      break;
-    default:
-      return false;
+    switch (id) {
+      case RobomasV2::MOTOR_STATE:
+        assign(&motor_state[n], frame.data);
+        break;
+      case RobomasV2::CONTROL:
+        assign(&control[n], frame.data);
+        control_mode[n] = control[n] & 0x03;
+        control_motor[n] = (control[n] >> 2) & 0x03;
+        dob_en[n] = (control[n] >> 4) & 0x01;
+        abs_enc_en[n] = (control[n] >> 5) & 0x01;
+        md_guess_en[n] = (control[n] >> 6) & 0x01;
+        break;
+      case RobomasV2::ABS_GEAR_RATIO:
+        assign(&abs_gear_ratio[n], frame.data);
+        break;
+      case RobomasV2::CAL_RQ:
+        assign(&cal_rq[n], frame.data);
+        break;
+      case RobomasV2::LOAD_J:
+        assign(&load_j[n], frame.data);
+        break;
+      case RobomasV2::LOAD_D:
+        assign(&load_d[n], frame.data);
+        break;
+      case RobomasV2::DOB_CF:
+        assign(&dob_cutoff_freq[n], frame.data);
+        break;
+      case RobomasV2::CAN_TIMEOUT:
+        assign(&can_timeout, frame.data);
+        break;
+      case RobomasV2::TRQ:
+        assign(&current_torque[n], frame.data);
+        break;
+      case RobomasV2::TRQ_TARGET:
+        assign(&trq_target[n], frame.data);
+        break;
+      case RobomasV2::SPD:
+        assign(&current_speed[n], frame.data);
+        break;
+      case RobomasV2::SPD_TARGET:
+        assign(&speed_target[n], frame.data);
+        break;
+      case RobomasV2::TRQ_LIM:
+        assign(&torque_lim[n], frame.data);
+        break;
+      case RobomasV2::SPD_GAIN_P:
+        assign(&speed_gain_p[n], frame.data);
+        break;
+      case RobomasV2::SPD_GAIN_I:
+        assign(&speed_gain_i[n], frame.data);
+        break;
+      case RobomasV2::SPD_GAIN_D:
+        assign(&speed_gain_d[n], frame.data);
+        break;
+      case RobomasV2::POS:
+        assign(&current_pos[n], frame.data);
+        break;
+      case RobomasV2::POS_TARGET:
+        assign(&pos_target[n], frame.data);
+        break;
+      case RobomasV2::SPD_LIM:
+        assign(&speed_lim[n], frame.data);
+        break;
+      case RobomasV2::POS_GAIN_P:
+        assign(&pos_gain_p[n], frame.data);
+        break;
+      case RobomasV2::POS_GAIN_I:
+        assign(&pos_gain_i[n], frame.data);
+        break;
+      case RobomasV2::POS_GAIN_D:
+        assign(&pos_gain_d[n], frame.data);
+        break;
+      case RobomasV2::ABS_POS:
+        assign(&abs_pos[n], frame.data);
+        break;
+      case RobomasV2::ABS_SPD:
+        assign(&abs_speed[n], frame.data);
+        break;
+      case RobomasV2::ABS_TURN_CNT:
+        assign(&abs_turn_cnt[n], frame.data);
+        break;
+      case RobomasV2::VESC_MODE:
+        assign(&vesc_mode[n], frame.data);
+        break;
+      case RobomasV2::VESC_TARGET:
+        assign(&vesc_target[n], frame.data);
+        break;
+      case RobomasV2::VESC_VOLTAGE:
+        assign(&vesc_voltage[n], frame.data);
+        break;
+      case RobomasV2::VESC_CURRENT:
+        assign(&vesc_current[n], frame.data);
+        break;
+      case RobomasV2::VESC_ERPM:
+        assign(&vesc_erpm[n], frame.data);
+        break;
+      case RobomasV2::MONITOR_PERIOD:
+        assign(&monitor_period, frame.data);
+        break;
+      case RobomasV2::MONITOR_REG1:
+        assign(&monitor_reg1[n], frame.data);
+        break;
+      case RobomasV2::MONITOR_REG2:
+        assign(&monitor_reg2[n], frame.data);
+        break;
+      default:
+        return false;
     }
     return true;
   }

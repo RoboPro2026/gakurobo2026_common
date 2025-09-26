@@ -32,14 +32,14 @@ constexpr uint8_t ROBOMAS_V1 = 0x2;
 constexpr uint8_t GPIO = 0x3;
 constexpr uint8_t ROBOMAS_V2 = 0x4;
 constexpr uint8_t FORCE_READ = 0xF;
-}; // namespace DataType
+};  // namespace DataType
 
 namespace CommonRegisterID
 {
 constexpr uint16_t RQ = 0x0001;
 constexpr uint16_t EMS = 0x000E;
 constexpr uint16_t RESET_EMS = 0x000F;
-} // namespace CommonRegisterID
+}  // namespace CommonRegisterID
 
 // 各基板のバージョンごとに名前空間を定義
 // そうすることで、基板のバージョンが更新されたときに、変更コストを最小限にできる。
@@ -55,7 +55,7 @@ constexpr uint16_t PWM = 0x10;
 constexpr uint16_t PWM_TARGET = 0x11;
 constexpr uint16_t SPEED = 0x20;
 constexpr uint16_t SPEED_TARGET = 0x21;
-constexpr uint16_t PWM_LIM = 0x22; // トルク制限
+constexpr uint16_t PWM_LIM = 0x22;  // トルク制限
 constexpr uint16_t SPEED_PID_P = 0x23;
 constexpr uint16_t SPEED_PID_I = 0x24;
 constexpr uint16_t SPEED_PID_D = 0x25;
@@ -83,7 +83,7 @@ constexpr int CONTROL_TYPE_ABS_POSITION_MODE = 0x03;
 constexpr float GEAR_RATIO_M2006 = 36.0f;
 constexpr float GEAR_RATIO_M3508 = 19.0f;
 
-} // namespace RobomasV1
+}  // namespace RobomasV1
 
 namespace RobomasV2
 {
@@ -137,7 +137,7 @@ constexpr int VESC_MODE_PWM = 0x01;
 constexpr int VESC_MODE_CURRENT = 0x02;
 constexpr int VESC_MODE_SPEED = 0x03;
 constexpr int VESC_MODE_POSITION = 0x04;
-} // namespace RobomasV2
+}  // namespace RobomasV2
 
 namespace GPIO
 {
@@ -152,4 +152,4 @@ constexpr uint16_t PWM_DUTY = 0x20;
 constexpr uint16_t MONITOR_PERIOD = 0xf0;
 constexpr uint16_t MONITOR_REG = 0xf1;
 
-} // namespace GPIO
+}  // namespace GPIO

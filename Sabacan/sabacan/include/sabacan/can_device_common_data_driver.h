@@ -16,20 +16,11 @@
 class CommonDataDriver : public CanDevice
 {
 public:
-  CommonDataDriver(std::shared_ptr<CanDriver> _can_driver) :
-      CanDevice(_can_driver, 0x00, DataType::FORCE_READ)
+  CommonDataDriver(std::shared_ptr<CanDriver> _can_driver)
+  : CanDevice(_can_driver, 0x00, DataType::FORCE_READ)
   {
   }
-  void id_rq()
-  {
-    tx_rq(CommonRegisterID::RQ);
-  }
-  void ems()
-  {
-    tx_rq(CommonRegisterID::EMS);
-  }
-  void reset_ems()
-  {
-    tx_rq(CommonRegisterID::RESET_EMS);
-  }
+  void id_rq() { tx_rq(CommonRegisterID::RQ); }
+  void ems() { tx_rq(CommonRegisterID::EMS); }
+  void reset_ems() { tx_rq(CommonRegisterID::RESET_EMS); }
 };

@@ -6,9 +6,8 @@
 #include <thread>
 #include <type_traits>
 
-#include "rclcpp/rclcpp.hpp"
-
 #include "can_msgs/msg/frame.hpp"
+#include "rclcpp/rclcpp.hpp"
 #include "sabacan/sabacan.h"
 #include "sabacan_msgs/msg/sabacan_robomas_ref.hpp"
 #include "sabacan_msgs/msg/sabacan_robomas_status.hpp"
@@ -28,7 +27,7 @@ public:
     // パラメータの制約や説明を記述子で定義
     auto board_id_descriptor = rcl_interfaces::msg::ParameterDescriptor();
     board_id_descriptor.description =
-        "The unique ID of the CAN board (0-15). This parameter is mandatory.";
+      "The unique ID of the CAN board (0-15). This parameter is mandatory.";
     board_id_descriptor.integer_range.resize(1);
     board_id_descriptor.integer_range[0].from_value = 0;
     board_id_descriptor.integer_range[0].to_value = 15;
@@ -38,7 +37,7 @@ public:
 
     this->declare_parameter("motor_type", std::vector<std::string>{"C610", "C610", "C610", "C610"});
     this->declare_parameter(
-        "control_type", std::vector<std::string>{"VELOCITY", "VELOCITY", "VELOCITY", "VELOCITY"});
+      "control_type", std::vector<std::string>{"VELOCITY", "VELOCITY", "VELOCITY", "VELOCITY"});
     this->declare_parameter("dob_en", std::vector<bool>{false, false, false, false});
     this->declare_parameter("abs_enc_en", std::vector<bool>{false, false, false, false});
     this->declare_parameter("md_guess_en", std::vector<bool>{false, false, false, false});
@@ -61,7 +60,7 @@ public:
     // デフォルトでは20Hz(50ms)で、MOTOR_STATE、TRQ、SPD、POS、ABS_POS、ABS_SPD、ABS_TURN_CNT、VESC_VOLTAGE、VESC_CURRENT、VESC_ERPMを送信
     this->declare_parameter("monitor_period", 50);
     // モニタ周期設定の有効/無効を制御するパラメータ
-    this->declare_parameter("enable_monitor_period", true); // デフォルトtrue
+    this->declare_parameter("enable_monitor_period", true);  // デフォルトtrue
     int64_t reg1 = 0LL;
     reg1 |= 1LL << RobomasV2::MOTOR_STATE;
     reg1 |= 1LL << RobomasV2::TRQ;
@@ -96,17 +95,15 @@ public:
     vesc_mode_map_["POSITION"] = RobomasV2::VESC_MODE_POSITION;
 
     // 必須パラメータ'board_id'が設定されているかチェック
-    try
-    {
+    try {
       this->get_parameter("board_id", board_id_);
-    }
-    catch (const rclcpp::exceptions::ParameterUninitializedException& e)
-    {
+    } catch (const rclcpp::exceptions::ParameterUninitializedException & e) {
       // パラメータが設定されていなかった場合、致命的なエラーを出して終了
-      RCLCPP_FATAL(this->get_logger(),
-                   "Mandatory parameter 'board_id' was not set. Please provide it at launch.\n"
-                   "Example: ros2 run your_package_name sabacan_robomasv2_node --ros-args -p "
-                   "board_id:=<value>");
+      RCLCPP_FATAL(
+        this->get_logger(),
+        "Mandatory parameter 'board_id' was not set. Please provide it at launch.\n"
+        "Example: ros2 run your_package_name sabacan_robomasv2_node --ros-args -p "
+        "board_id:=<value>");
       // コンストラクタで例外を投げることで、ノードの初期化を安全に中止します
       throw;
     }
@@ -115,51 +112,54 @@ public:
     robomas_driver_ = std::make_unique<RobomasDriverV2>(can_driver_, board_id_);
 
     can_driver_->register_tx_callback(
-        [this](uint32_t id, uint8_t* data, uint8_t dlc, bool is_remote, bool is_ext)
-        { this->tx(id, data, dlc, is_remote, is_ext); });
+      [this](uint32_t id, uint8_t * data, uint8_t dlc, bool is_remote, bool is_ext) {
+        this->tx(id, data, dlc, is_remote, is_ext);
+      });
 
     // CANデータ送信用のPublisher
     can_publisher_ = this->create_publisher<can_msgs::msg::Frame>("/to_can_bus", 100);
 
     // CANデータ受信用のSubscriber
     can_subscription_ = this->create_subscription<can_msgs::msg::Frame>(
-        "/from_can_bus", 100, std::bind(&SabaneCanNode::can_callback, this, std::placeholders::_1));
+      "/from_can_bus", 100, std::bind(&SabaneCanNode::can_callback, this, std::placeholders::_1));
 
     // 現在のモータの状態を昇進するPublisher
     sabacan_status_publisher_ = this->create_publisher<sabacan_msgs::msg::SabacanRobomasStatus>(
-        "/sabacan_robomas_status" + std::to_string(board_id_), 100);
+      "/sabacan_robomas_status" + std::to_string(board_id_), 100);
 
     // モータの指令値を受け取るSubscriber
     sabacan_ref_subscription_ = this->create_subscription<sabacan_msgs::msg::SabacanRobomasRef>(
-        "/sabacan_robomas_ref" + std::to_string(board_id_), 100,
-        std::bind(&SabaneCanNode::sabacan_ref_callback, this, std::placeholders::_1));
+      "/sabacan_robomas_ref" + std::to_string(board_id_), 100,
+      std::bind(&SabaneCanNode::sabacan_ref_callback, this, std::placeholders::_1));
 
     // サービスサーバーの作成
     set_gains_service_ = this->create_service<sabacan_msgs::srv::SetRobomasGains>(
-        "set_robomas_gains", std::bind(&SabaneCanNode::set_gains_callback, this,
-                                       std::placeholders::_1, std::placeholders::_2));
+      "set_robomas_gains",
+      std::bind(
+        &SabaneCanNode::set_gains_callback, this, std::placeholders::_1, std::placeholders::_2));
 
     // リセットサービスサーバーの作成
     reset_service_ = this->create_service<sabacan_msgs::srv::SabacanReset>(
-        "sabacan_robomas_reset", std::bind(&SabaneCanNode::reset_callback, this,
-                                           std::placeholders::_1, std::placeholders::_2));
+      "sabacan_robomas_reset",
+      std::bind(
+        &SabaneCanNode::reset_callback, this, std::placeholders::_1, std::placeholders::_2));
 
     // パラメータ変更コールバックの設定
     parameter_callback_handle_ = this->add_on_set_parameters_callback(
-        std::bind(&SabaneCanNode::parameter_callback, this, std::placeholders::_1));
+      std::bind(&SabaneCanNode::parameter_callback, this, std::placeholders::_1));
 
     // 100Hzでpublish用のtimerを呼ぶ
     publish_timer_ =
-        this->create_wall_timer(10ms, std::bind(&SabaneCanNode::publish_timer_callback, this));
+      this->create_wall_timer(10ms, std::bind(&SabaneCanNode::publish_timer_callback, this));
 
     // 初期化命令を送信
     robomas_init();
   }
 
-  template <typename T> bool check_size(std::vector<T> data, size_t _N, std::string name)
+  template <typename T>
+  bool check_size(std::vector<T> data, size_t _N, std::string name)
   {
-    if (data.size() != _N)
-    {
+    if (data.size() != _N) {
       RCLCPP_ERROR(this->get_logger(), "%s size error: size=%ld", name.c_str(), data.size());
       return false;
     }
@@ -167,10 +167,10 @@ public:
   }
 
   // データが範囲内かを確認
-  template <typename T> bool check_data_range(T data, T low, T high, std::string name)
+  template <typename T>
+  bool check_data_range(T data, T low, T high, std::string name)
   {
-    if ((low <= data && data <= high) == false)
-    {
+    if ((low <= data && data <= high) == false) {
       if constexpr (std::is_integral<T>())
         if constexpr (sizeof(T) <= 4)
           RCLCPP_ERROR(this->get_logger(), "%s is out of range. value = %d", name.c_str(), data);
@@ -186,12 +186,9 @@ public:
   template <typename T>
   bool check_data_range_and_size(std::vector<T> data, T low, T high, size_t _N, std::string name)
   {
-    if (check_size<T>(data, _N, name) == false)
-      return false;
-    for (size_t i = 0; i < _N; i++)
-    {
-      if (check_data_range<T>(data[i], low, high, name) == false)
-        return false;
+    if (check_size<T>(data, _N, name) == false) return false;
+    for (size_t i = 0; i < _N; i++) {
+      if (check_data_range<T>(data[i], low, high, name) == false) return false;
     }
     return true;
   }
@@ -205,7 +202,7 @@ public:
    * @param is_remote_frame
    * @param is_ext_id
    */
-  void tx(uint32_t id, uint8_t* data, uint8_t dlc, bool is_remote_frame, bool is_ext_id = true)
+  void tx(uint32_t id, uint8_t * data, uint8_t dlc, bool is_remote_frame, bool is_ext_id = true)
   {
     auto msg = std::make_unique<can_msgs::msg::Frame>();
     msg->header.stamp = this->get_clock()->now();
@@ -213,8 +210,7 @@ public:
     msg->is_extended = is_ext_id;
     msg->is_rtr = is_remote_frame;
     msg->dlc = dlc;
-    for (int i = 0; i < 8; i++)
-    {
+    for (int i = 0; i < 8; i++) {
       msg->data[i] = data[i];
     }
     RCLCPP_INFO(this->get_logger(), "Sending CAN frame: ID=0x%X", msg->id);
@@ -230,14 +226,13 @@ private:
   void can_callback(const can_msgs::msg::Frame::SharedPtr msg) const
   {
     RCLCPP_INFO(
-        this->get_logger(),
-        "Received CAN frame: ID=0x%X, DLC=%d, Data=[%02X %02X %02X %02X %02X %02X %02X %02X]",
-        msg->id, msg->dlc, msg->data[0], msg->data[1], msg->data[2], msg->data[3], msg->data[4],
-        msg->data[5], msg->data[6], msg->data[7]);
+      this->get_logger(),
+      "Received CAN frame: ID=0x%X, DLC=%d, Data=[%02X %02X %02X %02X %02X %02X %02X %02X]",
+      msg->id, msg->dlc, msg->data[0], msg->data[1], msg->data[2], msg->data[3], msg->data[4],
+      msg->data[5], msg->data[6], msg->data[7]);
     CanFrame frame;
     uint8_t data[8];
-    for (int i = 0; i < 8; i++)
-    {
+    for (int i = 0; i < 8; i++) {
       data[i] = msg->data[i];
     }
     frame = can_driver_->rx_frame(msg->id, data, msg->dlc, msg->is_rtr, msg->is_extended);
@@ -251,39 +246,35 @@ private:
    */
   void sabacan_ref_callback(const sabacan_msgs::msg::SabacanRobomasRef::SharedPtr msg)
   {
-    if (check_data_range<int>(msg->motor_number, 0, N, "motor_number") == false)
-      return;
-    bool is_dji_motor = (motor_type_[msg->motor_number] == RobomasV2::CONTROL_MOTOR_C610 ||
-                         motor_type_[msg->motor_number] == RobomasV2::CONTROL_MOTOR_C620);
+    if (check_data_range<int>(msg->motor_number, 0, N, "motor_number") == false) return;
+    bool is_dji_motor =
+      (motor_type_[msg->motor_number] == RobomasV2::CONTROL_MOTOR_C610 ||
+       motor_type_[msg->motor_number] == RobomasV2::CONTROL_MOTOR_C620);
     bool is_vesc = (motor_type_[msg->motor_number] == RobomasV2::CONTROL_MOTOR_VESC);
-    if (is_dji_motor)
-    {
-      switch (control_type_[msg->motor_number])
-      {
-      case RobomasV2::CONTROL_MODE_SPD:
-        robomas_driver_->setSpeedTarget(msg->motor_number, msg->ref);
-        break;
-      case RobomasV2::CONTROL_MODE_POS:
-        robomas_driver_->setPosTarget(msg->motor_number, msg->ref);
-        break;
-      case RobomasV2::CONTROL_MODE_TRQ:
-        robomas_driver_->setTorqueTarget(msg->motor_number, msg->ref);
-        break;
+    if (is_dji_motor) {
+      switch (control_type_[msg->motor_number]) {
+        case RobomasV2::CONTROL_MODE_SPD:
+          robomas_driver_->setSpeedTarget(msg->motor_number, msg->ref);
+          break;
+        case RobomasV2::CONTROL_MODE_POS:
+          robomas_driver_->setPosTarget(msg->motor_number, msg->ref);
+          break;
+        case RobomasV2::CONTROL_MODE_TRQ:
+          robomas_driver_->setTorqueTarget(msg->motor_number, msg->ref);
+          break;
       }
-    }
-    else if (is_vesc)
-    {
+    } else if (is_vesc) {
       robomas_driver_->setVescTarget(msg->motor_number, msg->ref);
     }
 
-    RCLCPP_INFO(this->get_logger(), "Received SabacanRef: motor_number=%d, ref=%f",
-                msg->motor_number, msg->ref);
+    RCLCPP_INFO(
+      this->get_logger(), "Received SabacanRef: motor_number=%d, ref=%f", msg->motor_number,
+      msg->ref);
   }
 
   void publish_timer_callback(void)
   {
-    for (int i = 0; i < N; i++)
-    {
+    for (int i = 0; i < N; i++) {
       auto msg = sabacan_msgs::msg::SabacanRobomasStatus();
       msg.motor_number = i;
       msg.motor_type = motor_type_name_[i];
@@ -337,32 +328,32 @@ private:
   void robomas_init()
   {
     // 初期化用パラメータ
-    std::vector<std::string> param_name{"motor_type",
-                                        "control_type",
-                                        "dob_en",
-                                        "abs_enc_en",
-                                        "md_guess_en",
-                                        "abs_gear_ratio",
-                                        "cal_rq",
-                                        "load_j",
-                                        "load_d",
-                                        "dob_cf",
-                                        "speed_gain_p",
-                                        "speed_gain_i",
-                                        "speed_gain_d",
-                                        "torque_lim",
-                                        "pos_gain_p",
-                                        "pos_gain_i",
-                                        "pos_gain_d",
-                                        "speed_lim",
-                                        "abs_turn_cnt",
-                                        "monitor_period",
-                                        "monitor_reg1",
-                                        "monitor_reg2",
-                                        "enable_monitor_period"};
+    std::vector<std::string> param_name{
+      "motor_type",
+      "control_type",
+      "dob_en",
+      "abs_enc_en",
+      "md_guess_en",
+      "abs_gear_ratio",
+      "cal_rq",
+      "load_j",
+      "load_d",
+      "dob_cf",
+      "speed_gain_p",
+      "speed_gain_i",
+      "speed_gain_d",
+      "torque_lim",
+      "pos_gain_p",
+      "pos_gain_i",
+      "pos_gain_d",
+      "speed_lim",
+      "abs_turn_cnt",
+      "monitor_period",
+      "monitor_reg1",
+      "monitor_reg2",
+      "enable_monitor_period"};
 
-    for (size_t i = 0; i < param_name.size(); i++)
-    {
+    for (size_t i = 0; i < param_name.size(); i++) {
       update_parameters(this->get_parameter(param_name[i]));
       // 初期化時にCAN通信を送信しすぎると良くない気がするので、少しだけ待機。
       // SocketCANやUSB-CANの仕様がわからないので、念の為。
@@ -371,19 +362,17 @@ private:
   }
 
   // パラメータ変更コールバック
-  rcl_interfaces::msg::SetParametersResult
-  parameter_callback(const std::vector<rclcpp::Parameter>& parameters)
+  rcl_interfaces::msg::SetParametersResult parameter_callback(
+    const std::vector<rclcpp::Parameter> & parameters)
   {
     rcl_interfaces::msg::SetParametersResult result;
     result.successful = true;
     bool ret = true;
 
-    for (const auto& parameter : parameters)
-    {
+    for (const auto & parameter : parameters) {
       if ((ret = update_parameters(parameter)))
         RCLCPP_INFO(this->get_logger(), "Updated parameter: %s", parameter.get_name().c_str());
-      if (ret == false)
-      {
+      if (ret == false) {
         result.successful = false;
       }
     }
@@ -392,37 +381,31 @@ private:
   }
 
   // サービスコールバック
-  void
-  set_gains_callback(const std::shared_ptr<sabacan_msgs::srv::SetRobomasGains::Request> request,
-                     std::shared_ptr<sabacan_msgs::srv::SetRobomasGains::Response> response)
+  void set_gains_callback(
+    const std::shared_ptr<sabacan_msgs::srv::SetRobomasGains::Request> request,
+    std::shared_ptr<sabacan_msgs::srv::SetRobomasGains::Response> response)
   {
-    if (request->motor_number >= N)
-    {
+    if (request->motor_number >= N) {
       response->success = false;
       response->message = "Invalid motor number. Must be 0-" + std::to_string(N - 1) + ".";
       return;
     }
 
-    try
-    {
+    try {
       int n = request->motor_number;
 
-      if (request->set_dob_param)
-      {
-        if (request->dob_load_j < 0.0)
-        {
+      if (request->set_dob_param) {
+        if (request->dob_load_j < 0.0) {
           response->message = "Invalid dob_load_j";
           response->success = false;
           return;
         }
-        if (request->dob_load_d < 0.0)
-        {
+        if (request->dob_load_d < 0.0) {
           response->message = "Invalid dob_load_d";
           response->success = false;
           return;
         }
-        if (request->dob_cutoff_freq < 0.0)
-        {
+        if (request->dob_cutoff_freq < 0.0) {
           response->message = "Invalid dob_cutoff_freq";
           response->success = false;
           return;
@@ -438,10 +421,8 @@ private:
         this->set_parameter(rclcpp::Parameter("dob_cf", dob_cf_));
       }
 
-      if (request->set_speed_gains)
-      {
-        if (request->torque_lim < 0.0)
-        {
+      if (request->set_speed_gains) {
+        if (request->torque_lim < 0.0) {
           response->message = "Invalid torque lim";
           response->success = false;
           return;
@@ -460,10 +441,8 @@ private:
         this->set_parameter(rclcpp::Parameter("torque_lim", torque_lim_));
       }
 
-      if (request->set_pos_gains)
-      {
-        if (request->speed_lim < 0.0)
-        {
+      if (request->set_pos_gains) {
+        if (request->speed_lim < 0.0) {
           response->message = "Invalid speed lim";
           response->success = false;
           return;
@@ -480,8 +459,7 @@ private:
         this->set_parameter(rclcpp::Parameter("speed_lim", speed_lim_));
       }
 
-      if (request->set_abs_turn_cnt)
-      {
+      if (request->set_abs_turn_cnt) {
         abs_turn_cnt_[n] = request->abs_turn_cnt;
         robomas_driver_->setAbsTurnCnt(n, abs_turn_cnt_[n]);
       }
@@ -490,21 +468,19 @@ private:
       response->message = "Gains updated successfully for motor " + std::to_string(n);
 
       RCLCPP_INFO(this->get_logger(), "Updated gains for motor %d via service", n);
-    }
-    catch (const std::exception& e)
-    {
+    } catch (const std::exception & e) {
       response->success = false;
       response->message = std::string("Error updating gains: ") + e.what();
     }
   }
 
   // リセットサービスコールバック
-  void reset_callback(const std::shared_ptr<sabacan_msgs::srv::SabacanReset::Request> request,
-                      std::shared_ptr<sabacan_msgs::srv::SabacanReset::Response> response)
+  void reset_callback(
+    const std::shared_ptr<sabacan_msgs::srv::SabacanReset::Request> request,
+    std::shared_ptr<sabacan_msgs::srv::SabacanReset::Response> response)
   {
-    (void)request; // 未使用パラメータ警告を抑制
-    try
-    {
+    (void)request;  // 未使用パラメータ警告を抑制
+    try {
       RCLCPP_INFO(this->get_logger(), "Received reset request for Robomas node");
 
       // Robomas初期化処理を実行
@@ -514,9 +490,7 @@ private:
       response->message = "Robomas node reset completed successfully";
 
       RCLCPP_INFO(this->get_logger(), "Robomas node reset completed");
-    }
-    catch (const std::exception& e)
-    {
+    } catch (const std::exception & e) {
       response->success = false;
       response->message = std::string("Error during Robomas reset: ") + e.what();
       RCLCPP_ERROR(this->get_logger(), "Robomas reset failed: %s", e.what());
@@ -537,259 +511,186 @@ private:
     bool ret = true;
     std::string name = parameter.get_name();
 
-    if (name == "board_id")
-    {
+    if (name == "board_id") {
       RCLCPP_ERROR(this->get_logger(), "Board id can't change.");
       return false;
-    }
-    else if (name == "motor_type")
-    {
+    } else if (name == "motor_type") {
       auto tmp_param = parameter.as_string_array();
       // パラメータが正しいかを確認
-      if (check_size(tmp_param, N, name) == false)
-        return false;
-      for (size_t i = 0; i < N; i++)
-      {
-        if (motor_type_map_.contains(tmp_param[i]) == false)
-        {
+      if (check_size(tmp_param, N, name) == false) return false;
+      for (size_t i = 0; i < N; i++) {
+        if (motor_type_map_.contains(tmp_param[i]) == false) {
           ret = false;
-          RCLCPP_ERROR(this->get_logger(), "motor type parameter[%ld] failed: %s", i,
-                       tmp_param[i].c_str());
+          RCLCPP_ERROR(
+            this->get_logger(), "motor type parameter[%ld] failed: %s", i, tmp_param[i].c_str());
         }
       }
-      if (ret == false)
-        return false;
+      if (ret == false) return false;
       // motor_typeを更新
       for (size_t i = 0; i < N; i++)
         motor_type_[i] = motor_type_map_[motor_type_name_[i] = tmp_param[i]];
       // N個のパラメータすべてに問題がなければ、CAN通信で送信
       for (int i = 0; i < N; i++)
-        robomas_driver_->setControl(i, (uint8_t)control_type_[i], (uint8_t)motor_type_[i],
-                                    dob_en_[i], abs_enc_en_[i], md_guess_en_[i]);
-    }
-    else if (name == "control_type")
-    {
+        robomas_driver_->setControl(
+          i, (uint8_t)control_type_[i], (uint8_t)motor_type_[i], dob_en_[i], abs_enc_en_[i],
+          md_guess_en_[i]);
+    } else if (name == "control_type") {
       auto tmp_param = parameter.as_string_array();
       // パラメータが正しいか確認
-      if (check_size(control_type_, N, "control_type") == false)
-        return false;
+      if (check_size(control_type_, N, "control_type") == false) return false;
       std::vector<bool> is_dji_motor(N);
       std::vector<bool> is_vesc(N);
       std::vector<bool> is_dji_motor_map_ok(N);
       std::vector<bool> is_vesc_map_ok(N);
-      for (size_t i = 0; i < N; i++)
-      {
-        is_dji_motor[i] = (motor_type_[i] == RobomasV2::CONTROL_MOTOR_C610 ||
-                           motor_type_[i] == RobomasV2::CONTROL_MOTOR_C620);
+      for (size_t i = 0; i < N; i++) {
+        is_dji_motor[i] =
+          (motor_type_[i] == RobomasV2::CONTROL_MOTOR_C610 ||
+           motor_type_[i] == RobomasV2::CONTROL_MOTOR_C620);
         is_vesc[i] = (motor_type_[i] == RobomasV2::CONTROL_MOTOR_VESC);
         is_dji_motor_map_ok[i] = (is_dji_motor[i] && control_type_map_.contains(tmp_param[i]));
         is_vesc_map_ok[i] = (is_vesc[i] && vesc_mode_map_.contains(tmp_param[i]));
 
-        if (is_dji_motor_map_ok[i] == false && is_vesc_map_ok[i] == false)
-        {
+        if (is_dji_motor_map_ok[i] == false && is_vesc_map_ok[i] == false) {
           ret = false;
-          RCLCPP_ERROR(this->get_logger(), "control type parameter[%ld] failed: %s", i,
-                       tmp_param[i].c_str());
+          RCLCPP_ERROR(
+            this->get_logger(), "control type parameter[%ld] failed: %s", i, tmp_param[i].c_str());
         }
       }
-      if (ret == false)
-        return ret;
+      if (ret == false) return ret;
       // 値を更新
-      for (size_t i = 0; i < N; i++)
-      {
+      for (size_t i = 0; i < N; i++) {
         control_type_name_[i] = tmp_param[i];
-        if (is_dji_motor_map_ok[i])
-        {
+        if (is_dji_motor_map_ok[i]) {
           control_type_[i] = control_type_map_[control_type_name_[i]];
           vesc_mode_[i] = RobomasV2::VESC_MODE_DISABLE;
-        }
-        else if (is_vesc_map_ok[i])
-        {
+        } else if (is_vesc_map_ok[i]) {
           // control_typeは設定せず、vesc_modeのみ設定
           vesc_mode_[i] = vesc_mode_map_[control_type_name_[i]];
         }
         // N個のパラメータすべてに問題がなければ、CAN通信で送信
-        for (int i = 0; i < N; i++)
-        {
-          robomas_driver_->setControl(i, (uint8_t)control_type_[i], (uint8_t)motor_type_[i],
-                                      dob_en_[i], abs_enc_en_[i], md_guess_en_[i]);
+        for (int i = 0; i < N; i++) {
+          robomas_driver_->setControl(
+            i, (uint8_t)control_type_[i], (uint8_t)motor_type_[i], dob_en_[i], abs_enc_en_[i],
+            md_guess_en_[i]);
           robomas_driver_->setVescMode(i, vesc_mode_[i]);
         }
       }
-    }
-    else if (name == "dob_en")
-    {
+    } else if (name == "dob_en") {
       auto tmp_param = parameter.as_bool_array();
-      if ((ret = check_size(tmp_param, N, name)))
-      {
+      if ((ret = check_size(tmp_param, N, name))) {
         dob_en_ = tmp_param;
         for (int i = 0; i < N; i++)
-          robomas_driver_->setControl(i, (uint8_t)control_type_[i], (uint8_t)motor_type_[i],
-                                      dob_en_[i], abs_enc_en_[i], md_guess_en_[i]);
+          robomas_driver_->setControl(
+            i, (uint8_t)control_type_[i], (uint8_t)motor_type_[i], dob_en_[i], abs_enc_en_[i],
+            md_guess_en_[i]);
       }
-    }
-    else if (name == "abs_enc_en")
-    {
+    } else if (name == "abs_enc_en") {
       auto tmp_param = parameter.as_bool_array();
-      if ((ret = check_size(tmp_param, N, name)))
-      {
+      if ((ret = check_size(tmp_param, N, name))) {
         abs_enc_en_ = tmp_param;
         for (int i = 0; i < N; i++)
-          robomas_driver_->setControl(i, (uint8_t)control_type_[i], (uint8_t)motor_type_[i],
-                                      dob_en_[i], abs_enc_en_[i], md_guess_en_[i]);
+          robomas_driver_->setControl(
+            i, (uint8_t)control_type_[i], (uint8_t)motor_type_[i], dob_en_[i], abs_enc_en_[i],
+            md_guess_en_[i]);
       }
-    }
-    else if (name == "md_guess_en")
-    {
+    } else if (name == "md_guess_en") {
       auto tmp_param = parameter.as_bool_array();
-      if ((ret = check_size(tmp_param, N, name)))
-      {
+      if ((ret = check_size(tmp_param, N, name))) {
         md_guess_en_ = tmp_param;
         for (int i = 0; i < N; i++)
-          robomas_driver_->setControl(i, (uint8_t)control_type_[i], (uint8_t)motor_type_[i],
-                                      dob_en_[i], abs_enc_en_[i], md_guess_en_[i]);
+          robomas_driver_->setControl(
+            i, (uint8_t)control_type_[i], (uint8_t)motor_type_[i], dob_en_[i], abs_enc_en_[i],
+            md_guess_en_[i]);
       }
-    }
-    else if (name == "abs_gear_ratio")
-    {
+    } else if (name == "abs_gear_ratio") {
       auto tmp_param = parameter.as_double_array();
       if ((ret = check_data_range_and_size(tmp_param, 0.0, inf, N, name)))
         for (int i = 0; i < N; i++)
           robomas_driver_->setAbsGearRatio(i, abs_gear_ratio_[i] = tmp_param[i]);
-    }
-    else if (name == "cal_rq")
-    {
+    } else if (name == "cal_rq") {
       auto tmp_param = parameter.as_bool_array();
       if ((ret = check_size(tmp_param, N, name)))
-        for (int i = 0; i < N; i++)
-          robomas_driver_->setCalRq(i, cal_rq_[i] = tmp_param[i]);
-    }
-    else if (name == "load_j")
-    {
+        for (int i = 0; i < N; i++) robomas_driver_->setCalRq(i, cal_rq_[i] = tmp_param[i]);
+    } else if (name == "load_j") {
       auto tmp_param = parameter.as_double_array();
       if ((ret = check_data_range_and_size(tmp_param, 0.0, inf, N, name)))
-        for (int i = 0; i < N; i++)
-          robomas_driver_->setLoad_J(i, load_j_[i] = tmp_param[i]);
-    }
-    else if (name == "load_d")
-    {
+        for (int i = 0; i < N; i++) robomas_driver_->setLoad_J(i, load_j_[i] = tmp_param[i]);
+    } else if (name == "load_d") {
       auto tmp_param = parameter.as_double_array();
       if ((ret = check_data_range_and_size(tmp_param, 0.0, inf, N, name)))
-        for (int i = 0; i < N; i++)
-          robomas_driver_->setLoad_D(i, load_d_[i] = tmp_param[i]);
-    }
-    else if (name == "dob_cf")
-    {
+        for (int i = 0; i < N; i++) robomas_driver_->setLoad_D(i, load_d_[i] = tmp_param[i]);
+    } else if (name == "dob_cf") {
       auto tmp_param = parameter.as_double_array();
       if ((ret = check_data_range_and_size(dob_cf_, 0.0, inf, N, name)))
-        for (int i = 0; i < N; i++)
-          robomas_driver_->setDob_CF(i, dob_cf_[i] = tmp_param[i]);
-    }
-    else if (name == "speed_gain_p")
-    {
+        for (int i = 0; i < N; i++) robomas_driver_->setDob_CF(i, dob_cf_[i] = tmp_param[i]);
+    } else if (name == "speed_gain_p") {
       auto tmp_param = parameter.as_double_array();
       if ((ret = check_size(tmp_param, N, name)))
         for (int i = 0; i < N; i++)
           robomas_driver_->setSpeedGainP(i, speed_gain_p_[i] = tmp_param[i]);
-    }
-    else if (name == "speed_gain_i")
-    {
+    } else if (name == "speed_gain_i") {
       auto tmp_param = parameter.as_double_array();
       if ((ret = check_size(tmp_param, N, name)))
         for (int i = 0; i < N; i++)
           robomas_driver_->setSpeedGainI(i, speed_gain_i_[i] = tmp_param[i]);
-    }
-    else if (name == "speed_gain_d")
-    {
+    } else if (name == "speed_gain_d") {
       auto tmp_param = parameter.as_double_array();
       if ((ret = check_size(tmp_param, N, name)))
         for (int i = 0; i < N; i++)
           robomas_driver_->setSpeedGainD(i, speed_gain_d_[i] = tmp_param[i]);
-    }
-    else if (name == "torque_lim")
-    {
+    } else if (name == "torque_lim") {
       auto tmp_param = parameter.as_double_array();
       if ((ret = check_data_range_and_size(tmp_param, 0.0, inf, N, name)))
         for (int i = 0; i < N; i++)
           robomas_driver_->setTorqueLimit(i, torque_lim_[i] = tmp_param[i]);
-    }
-    else if (name == "pos_gain_p")
-    {
+    } else if (name == "pos_gain_p") {
       auto tmp_param = parameter.as_double_array();
       if ((ret = check_size(tmp_param, N, name)))
-        for (int i = 0; i < N; i++)
-          robomas_driver_->setPosGainP(i, pos_gain_p_[i] = tmp_param[i]);
-    }
-    else if (name == "pos_gain_i")
-    {
+        for (int i = 0; i < N; i++) robomas_driver_->setPosGainP(i, pos_gain_p_[i] = tmp_param[i]);
+    } else if (name == "pos_gain_i") {
       auto tmp_param = parameter.as_double_array();
       if ((ret = check_size(tmp_param, N, name)))
-        for (int i = 0; i < N; i++)
-          robomas_driver_->setPosGainI(i, pos_gain_i_[i] = tmp_param[i]);
-    }
-    else if (name == "pos_gain_d")
-    {
+        for (int i = 0; i < N; i++) robomas_driver_->setPosGainI(i, pos_gain_i_[i] = tmp_param[i]);
+    } else if (name == "pos_gain_d") {
       auto tmp_param = parameter.as_double_array();
       if ((ret = check_size(tmp_param, N, name)))
-        for (int i = 0; i < N; i++)
-          robomas_driver_->setPosGainD(i, pos_gain_d_[i] = tmp_param[i]);
-    }
-    else if (name == "speed_lim")
-    {
+        for (int i = 0; i < N; i++) robomas_driver_->setPosGainD(i, pos_gain_d_[i] = tmp_param[i]);
+    } else if (name == "speed_lim") {
       auto tmp_param = parameter.as_double_array();
       if ((ret = check_data_range_and_size(tmp_param, 0.0, inf, N, name)))
-        for (int i = 0; i < N; i++)
-          robomas_driver_->setSpeedLim(i, speed_lim_[i] = tmp_param[i]);
-    }
-    else if (name == "abs_turn_cnt")
-    {
+        for (int i = 0; i < N; i++) robomas_driver_->setSpeedLim(i, speed_lim_[i] = tmp_param[i]);
+    } else if (name == "abs_turn_cnt") {
       auto tmp_param = parameter.as_integer_array();
       if ((ret = check_size(tmp_param, N, name)))
         for (int i = 0; i < N; i++)
           robomas_driver_->setAbsTurnCnt(i, abs_turn_cnt_[i] = tmp_param[i]);
-    }
-    else if (name == "monitor_period")
-    {
+    } else if (name == "monitor_period") {
       auto tmp_param = parameter.as_int();
-      if ((ret = check_data_range<int64_t>(tmp_param, 0, 65536, name)))
-      {
+      if ((ret = check_data_range<int64_t>(tmp_param, 0, 65536, name))) {
         monitor_period_ = tmp_param;
-        if (enable_monitor_period_)
-          robomas_driver_->setMonitorPeriod(monitor_period_);
+        if (enable_monitor_period_) robomas_driver_->setMonitorPeriod(monitor_period_);
       }
-    }
-    else if (name == "monitor_reg1")
-    {
+    } else if (name == "monitor_reg1") {
       auto tmp_param = parameter.as_integer_array();
       monitor_reg1_ = tmp_param;
       if (enable_monitor_period_)
-        for (int i = 0; i < N; i++)
-          robomas_driver_->setMonitorReg1(i, monitor_reg1_[i]);
-    }
-    else if (name == "monitor_reg2")
-    {
+        for (int i = 0; i < N; i++) robomas_driver_->setMonitorReg1(i, monitor_reg1_[i]);
+    } else if (name == "monitor_reg2") {
       auto tmp_param = parameter.as_integer_array();
       monitor_reg2_ = tmp_param;
       if (enable_monitor_period_)
-        for (int i = 0; i < N; i++)
-          robomas_driver_->setMonitorReg2(i, monitor_reg2_[i]);
-    }
-    else if (name == "enable_monitor_period")
-    {
+        for (int i = 0; i < N; i++) robomas_driver_->setMonitorReg2(i, monitor_reg2_[i]);
+    } else if (name == "enable_monitor_period") {
       auto tmp_param = parameter.as_bool();
       // enable_monitor_periodがtrueの場合のみ、monitor_periodとmonitor_regを設定
-      if ((enable_monitor_period_ = tmp_param))
-      {
+      if ((enable_monitor_period_ = tmp_param)) {
         robomas_driver_->setMonitorPeriod(monitor_period_);
-        for (int i = 0; i < N; i++)
-        {
+        for (int i = 0; i < N; i++) {
           robomas_driver_->setMonitorReg1(i, monitor_reg1_[i]);
           robomas_driver_->setMonitorReg2(i, monitor_reg2_[i]);
         }
       }
-    }
-    else
-    {
+    } else {
       ret = false;
     }
     return ret;
@@ -843,7 +744,7 @@ private:
   bool enable_monitor_period_ = true;
 };
 
-int main(int argc, char* argv[])
+int main(int argc, char * argv[])
 {
   rclcpp::init(argc, argv);
   rclcpp::spin(std::make_shared<SabaneCanNode>());
