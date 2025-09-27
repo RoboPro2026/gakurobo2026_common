@@ -44,7 +44,7 @@ target_include_directories(sabacan_robomasv2_node PUBLIC
   $<INSTALL_INTERFACE:include>
 )
 
-# Install targets https://github.com/zezba9000/MSI-Claw-Gamepad-Mode
+# Install targets
 install(TARGETS
   sabacan_gpio_node
   sabacan_power_node
