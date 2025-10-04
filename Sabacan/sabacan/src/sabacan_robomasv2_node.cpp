@@ -27,10 +27,10 @@ public:
     // パラメータの制約や説明を記述子で定義
     auto board_id_descriptor = rcl_interfaces::msg::ParameterDescriptor();
     board_id_descriptor.description =
-      "The unique ID of the CAN board (0-15). This parameter is mandatory.";
+      "The unique ID of the CAN board (0-9). This parameter is mandatory.";
     board_id_descriptor.integer_range.resize(1);
     board_id_descriptor.integer_range[0].from_value = 0;
-    board_id_descriptor.integer_range[0].to_value = 15;
+    board_id_descriptor.integer_range[0].to_value = 9;
     board_id_descriptor.integer_range[0].step = 1;
     // 記述子を使い、型を指定して宣言 (デフォルト値を渡さない)
     this->declare_parameter<int64_t>("board_id", board_id_descriptor);
