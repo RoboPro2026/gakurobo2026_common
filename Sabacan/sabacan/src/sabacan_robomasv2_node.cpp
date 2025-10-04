@@ -123,7 +123,7 @@ public:
     can_subscription_ = this->create_subscription<can_msgs::msg::Frame>(
       "/from_can_bus", 100, std::bind(&SabaneCanNode::can_callback, this, std::placeholders::_1));
 
-    // 現在のモータの状態を昇進するPublisher
+    // 現在のモータの状態を送信するPublisher
     sabacan_status_publisher_ = this->create_publisher<sabacan_msgs::msg::SabacanRobomasStatus>(
       "/sabacan_robomas_status" + std::to_string(board_id_), 100);
 
