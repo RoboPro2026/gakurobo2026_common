@@ -53,15 +53,40 @@ install(TARGETS
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
-  find_package(ament_lint_auto REQUIRED)
-  # the following line skips the linter which checks for copyrights
-  # comment the line when a copyright and license is added to all source files
-  set(ament_cmake_copyright_FOUND TRUE)
-  # the following line skips cpplint (only works in a git repo)
-  # comment the line when this package is in a git repo and when
-  # a copyright and license is added to all source files
-  set(ament_cmake_cpplint_FOUND TRUE)
-  ament_lint_auto_find_test_dependencies()
+  find_package(ament_cmake_gtest REQUIRED)
+
+  ament_add_gtest(test_can_device_robomas_driver_v2 test/test_can_device_robomas_driver_v2.cpp)
+  ament_add_gtest(test_sabacan_robomasv2_node test/test_sabacan_robomasv2_node.cpp)
+
+  ament_target_dependencies(test_can_device_robomas_driver_v2
+    rclcpp
+    can_msgs
+    std_msgs
+    sabacan_msgs
+    ament_cmake_gtest
+    rcutils # ログレベル設定用
+  )
+
+  ament_target_dependencies(test_sabacan_robomasv2_node
+    rclcpp
+    can_msgs
+    std_msgs
+    sabacan_msgs
+    ament_cmake_gtest
+    rcutils # ログレベル設定用
+  )
+
+  target_include_directories(test_can_device_robomas_driver_v2 PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+  )
+
+  target_include_directories(test_sabacan_robomasv2_node PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+  )
+
+
 endif()
 
 ament_package()
