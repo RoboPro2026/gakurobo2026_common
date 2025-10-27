@@ -9,6 +9,8 @@
  * 
  */
 
+// TODO: やる気がなくなって、中途半端で止まっている状態なので、気が向いたら実装を完成させる
+
 #include <gtest/gtest.h>
 
 #include <chrono>
@@ -54,8 +56,6 @@ const std::string RESET_SERVICE = "/sabacan_robomas_reset";
 const std::string TO_CAN_TOPIC = "/to_can_bus";
 //
 const std::string FROM_CAN_TOPIC = "/from_can_bus";
-
-// TODO: テストのクラスの名前をもうちょっとマシなやつにする
 
 class MyTestNode : public testing::Test
 {
@@ -151,7 +151,6 @@ TEST_F(MyTestNode, ParameterBoardId)
 /**
  * @brief SetGains サービス呼び出しのテスト
  */
-// TODO: いらないので後で消す
 TEST_F(MyTestNode, SetGainsServiceCall)
 {
   RCLCPP_INFO(test_node->get_logger(), "Testing SetGains service call...");
