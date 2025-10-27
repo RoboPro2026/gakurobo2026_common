@@ -22,6 +22,21 @@ struct CanFrame
   uint16_t register_id;
   uint8_t data[8];
   uint8_t len;
+
+  bool operator==(const CanFrame & can_frame) const
+  {
+    bool ret = true;
+    ret &= (is_request == can_frame.is_request);
+    ret &= (priority == can_frame.priority);
+    ret &= (data_type == can_frame.data_type);
+    ret &= (board_id == can_frame.board_id);
+    ret &= (register_id == can_frame.register_id);
+    ret &= (len == can_frame.len);
+    for (int i = 0; i < len; i++) {
+      ret &= (data[i] == can_frame.data[i]);
+    }
+    return ret;
+  }
 };
 
 namespace DataType
