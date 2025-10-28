@@ -63,6 +63,7 @@ ros2 run sabacan sabacan_gpio_node --ros-args \
       * メッセージ: `sabacan_msgs/msg/SabacanGPIORefInt`
           * `pin_number` (uint8): ピン番号 (0-8)
           * `ref_int` (int32): 指令値 (ESC値 50〜100)
+            * ただし、使うESCによっては値の範囲が変わるので注意。
       * **例 (board\_id=2, ピン8, ESC値 75):**
         ```bash
         ros2 topic pub /sabacan_gpio_ref_int2 sabacan_msgs/msg/SabacanGPIORefInt '{pin_number: 8, ref_int: 75}'
