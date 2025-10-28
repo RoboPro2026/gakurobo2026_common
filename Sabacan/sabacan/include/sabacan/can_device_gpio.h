@@ -15,6 +15,7 @@ class GPIODriver : public CanDevice
 {
 public:
   static constexpr int N = 9;
+  static constexpr int PWM_COUNTER_FREQ = 50000;  // 50kHz
   uint16_t port_mode;
   uint16_t port_read;
   uint16_t port_write;
