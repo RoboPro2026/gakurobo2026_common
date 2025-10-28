@@ -12,8 +12,9 @@ find_package(std_msgs REQUIRED)
 
 # Generate interfaces
 rosidl_generate_interfaces(${PROJECT_NAME}
-  "msg/SabacanGPIORef.msg"
-  "msg/SabacanGPIORes.msg"
+  "msg/SabacanGPIORefFloat.msg"
+  "msg/SabacanGPIORefInt.msg"
+  "msg/SabacanGPIOStatus.msg"
   "msg/SabacanPowerRef.msg"
   "msg/SabacanRobomasRef.msg"
   "msg/SabacanRobomasStatus.msg"
