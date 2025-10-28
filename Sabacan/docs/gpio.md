@@ -1,6 +1,6 @@
 # `sabacan_gpio_node` の使い方
 
-`sabacan_gpio_node` は、GPIO制御基板をROS 2で制御するためのノードです。
+`sabacan_gpio_node` は、GPIO制御基板をROS 2で制御するためのノードです。1つの基板で9つのGPIOを操作することができます。出力はPWMやESC駆動用パルスなどに対応しています。
 
 ## 1. ノードの起動
 
