@@ -9,30 +9,11 @@
 #include "can_msgs/msg/frame.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sabacan/sabacan.h"
-// #include "sabacan_msgs/msg/sabacan_gpio_ref.hpp"
-
-// #include "sabacan_msgs/msg/sabacan_gpio_res.hpp"
 #include "sabacan_msgs/msg/sabacan_gpio_ref_float.hpp"
 #include "sabacan_msgs/msg/sabacan_gpio_ref_int.hpp"
 #include "sabacan_msgs/msg/sabacan_gpio_status.hpp"
 #include "sabacan_msgs/srv/sabacan_reset.hpp"
-/*
-SabacanGPIORefFloat
-pin_number
-ref_float
-// pwm_periodは削除。毎回送る必要はないので
-SabacanGPIORefInt
-pin_number
-ref_int
 
-SabacanGPIOStatus
-pin_number
-input
-
-
-これ以外の情報はすべて、parameterとserviceで持つことにする
-
-*/
 using namespace std::chrono_literals;
 
 class SabacanGPIONode : public rclcpp::Node
