@@ -47,6 +47,7 @@ public:
     this->declare_parameter("enable_monitor_period", true);
     int64_t reg = 0LL;
     reg |= 1LL << GPIO::PORT_READ;
+    reg |= 1LL << GPIO::PWM_DUTY;
     this->declare_parameter("monitor_reg", reg);
 
     // map
@@ -175,7 +176,11 @@ public:
     for (int i = 0; i < 8; i++) {
       msg->data[i] = data[i];
     }
-    RCLCPP_INFO(this->get_logger(), "Sending CAN frame: ID=0x%X", msg->id);
+    RCLCPP_INFO(
+      this->get_logger(),
+      "Sending CAN frame: ID=0x%X, DLC=%d, Data=[%02X %02X %02X %02X %02X %02X %02X %02X]", msg->id,
+      msg->dlc, msg->data[0], msg->data[1], msg->data[2], msg->data[3], msg->data[4], msg->data[5],
+      msg->data[6], msg->data[7]);
     can_publisher_->publish(std::move(msg));
   }
 
@@ -252,6 +257,8 @@ public:
       // (1 / pwm_freq_[pin_num]) / (1 / GPIODriver::PWM_COUNTER_FREQ)
       uint16_t pwm_period = GPIODriver::PWM_COUNTER_FREQ / pwm_freq_[pin_num];
       uint16_t pwm_duty = static_cast<uint16_t>(msg->ref_float * pwm_period);
+
+      pwm_duty_[pin_num] = pwm_duty;
       gpio_driver_->setPwmDuty(pin_num, pwm_duty);
 
       RCLCPP_INFO(
@@ -292,7 +299,7 @@ public:
           esc_value, pin_num);
         return;
       }
-
+      pwm_duty_[pin_num] = esc_value;
       gpio_driver_->setPwmDuty(pin_num, esc_value);
 
       RCLCPP_INFO(
@@ -387,6 +394,7 @@ public:
       uint16_t port_mode = 0x000;
       uint16_t int_en = 0x000;
       uint16_t esc_mode_en = 0x000;
+      uint16_t port_write = 0x000;
       for (size_t i = 0; i < N; i++) {
         // CANデバイスに設定を送信
         if (pin_type_[i] == PIN_TYPE_INPUT) {
@@ -398,11 +406,23 @@ public:
           // ESCモードを有効にする。
           esc_mode_en |= (1 << i);
         }
+
+        // port_writeを計算
+        if (pin_type_[i] != PIN_TYPE_INPUT) {
+          port_write |= 1 << i;
+        }
       }
       // 出力に設定
       gpio_driver_->setPortMode(port_mode);
       gpio_driver_->setPortIntEn(int_en);
       gpio_driver_->setEscModeEn(esc_mode_en);
+      // 出力のdutyを設定、初期値がなぜか0xFFFFとなっているので
+      for (size_t i = 0; i < N; i++) {
+        gpio_driver_->setPwmDuty(i, pwm_duty_[i]);
+      }
+      // 設定が完了したから、出力を有効にする
+      gpio_driver_->setPortWrite(port_write);
+
     } else if (name == "pwm_freq") {
       auto tmp_param = parameter.as_integer_array();
       if (check_data_range_and_size<int64_t>(tmp_param, 0, inf, N, name) == false) return false;
@@ -476,6 +496,7 @@ private:
   bool enable_monitor_period_;
   int64_t monitor_period_;
   int64_t monitor_reg_;
+  std::vector<uint16_t> pwm_duty_ = std::vector<uint16_t>(N);
 };
 
 int main(int argc, char * argv[])

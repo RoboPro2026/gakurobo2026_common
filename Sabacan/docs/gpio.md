@@ -30,7 +30,8 @@ ros2 run sabacan sabacan_gpio_node --ros-args \
 ```
 
 **主要なパラメータ:**
-
+プログラムの都合上、パラメータを変更した際に、一瞬だけ出力が止まったり、不安定な挙動になる可能性があるので注意。  
+なにか特別な理由がない限り、pin_typeやpwm_freqは動作中に変更するという運用はあまりしないほうがいいかも
   * `board_id` (int64, **必須**): 基板のCAN ID (0〜9)。
   * `pin_type` (string配列, デフォルト: 全て `"INPUT"`):
       * `"INPUT"`: デジタル入力。
@@ -63,7 +64,7 @@ ros2 run sabacan sabacan_gpio_node --ros-args \
       * メッセージ: `sabacan_msgs/msg/SabacanGPIORefInt`
           * `pin_number` (uint8): ピン番号 (0-8)
           * `ref_int` (int32): 指令値 (ESC値 50〜100)
-            * ただし、使うESCによっては値の範囲が変わるので注意。
+            * ただし、使うESCによっては値の範囲が変わることがあるので注意。
       * **例 (board\_id=2, ピン8, ESC値 75):**
         ```bash
         ros2 topic pub /sabacan_gpio_ref_int2 sabacan_msgs/msg/SabacanGPIORefInt '{pin_number: 8, ref_int: 75}'
