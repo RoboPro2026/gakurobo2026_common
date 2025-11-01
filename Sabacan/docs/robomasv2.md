@@ -55,6 +55,8 @@ ros2 run sabacan sabacan_robomasv2_node --ros-args -p board_id:=0 \
       * **初期値**: `[false, false, false, false]`。
   * `abs_gear_ratio` (double配列): アブソリュートエンコーダのギア比。
       * **初期値**: `[1.0, 1.0, 1.0, 1.0]`。
+      * モーターの出力軸からアブソに至るまでの減速比　回転方向が反転するなら負の値を入力
+      * ロボマス内臓のエンコーダーを使うときは関係ないので注意
   * `cal_rq` (bool配列): キャリブレーション要求フラグ。
       * **初期値**: `[false, false, false, false]`。
   * `load_j` (double配列): DOBのイナーシャパラメータ [$kg \cdot m^2$]。
