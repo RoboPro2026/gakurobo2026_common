@@ -110,9 +110,13 @@ public:
   {
     int id = frame.register_id & 0xff;
     int n = (frame.register_id & 0xf00) >> 8;
-    if (!(0 <= n && n < N)) {
-      return false;
-    }
+
+    // 違う基板へのメッセージは無視する
+    if (frame.data_type != this->data_type) return false;
+    if (frame.board_id != this->board_id) return false;
+    // motor_numberが範囲外の場合は無視する
+    if (!(0 <= n && n < N)) return false;
+
     switch (id) {
       case RobomasV1::MOTOR_TYPE:
         assign(&motor_type[n], frame.data);
