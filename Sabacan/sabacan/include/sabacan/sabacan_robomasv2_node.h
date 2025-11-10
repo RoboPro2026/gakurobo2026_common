@@ -226,7 +226,7 @@ private:
    *
    * @param msg
    */
-  void can_callback(const can_msgs::msg::Frame::SharedPtr msg) const
+  void can_callback(const can_msgs::msg::Frame::SharedPtr msg)
   {
     RCLCPP_INFO(
       this->get_logger(),
@@ -332,9 +332,8 @@ private:
 
     for (size_t i = 0; i < param_name.size(); i++) {
       update_parameters(this->get_parameter(param_name[i]));
-      // 初期化時にCAN通信を送信しすぎると良くない気がするので、少しだけ待機。
-      // SocketCANやUSB-CANの仕様がわからないので、念の為。
-      // std::this_thread::sleep_for(20ms);
+      // このdelayがないと、うまく動かないときがある
+      std::this_thread::sleep_for(10ms);
     }
   }
 

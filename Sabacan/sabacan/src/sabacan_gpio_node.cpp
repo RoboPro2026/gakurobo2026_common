@@ -360,6 +360,8 @@ public:
       "pin_type", "pwm_freq", "monitor_period", "enable_monitor_period", "monitor_reg"};
     for (size_t i = 0; i < param_name.size(); i++) {
       update_parameters(this->get_parameter(param_name[i]));
+      // このdelayがないと、うまく動かないときがある
+      std::this_thread::sleep_for(10ms);
     }
   }
 
