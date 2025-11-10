@@ -47,6 +47,10 @@ public:
 
   bool receive(CanFrame frame)
   {
+    // 違う基板へのメッセージは無視する
+    if (frame.data_type != this->data_type) return false;
+    if (frame.board_id != this->board_id) return false;
+
     switch (frame.register_id) {
       case GPIO::PORT_MODE:
         assign(&port_mode, frame.data);
