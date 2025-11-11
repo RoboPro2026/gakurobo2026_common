@@ -111,15 +111,9 @@ ros2 service call /sabacan_gpio_reset sabacan_msgs/srv/SabacanReset '{}'
 - PWMのDutyは `/sabacan_gpio_ref_float<board_id>`、ESCは `/sabacan_gpio_ref_int<board_id>` で送る。
 - ESC値は50〜100の範囲。値外は無視されます。
 
-### 4. 周期送信（モニタ）が重い/スパイクする
-- `monitor_period` を大きく（例: 50→100ms）。
-- `monitor_reg` から不要項目を外す（`PORT_READ`のみ等）。
-- `enable_monitor_period=false` で一時的に停止、または `monitor_period=0`。
-- `canbusload can0@1000000` で負荷を確認。高負荷時は項目/周波数を削減。
-
-### 5. ROS/CANの確認コマンド
-- ROS: `ros2 node list`, `ros2 topic list`, `ros2 topic echo /sabacan_gpio_status2`, `ros2 param list`。
-- CAN: `ip -details -statistics link show can0`, `canbusload can0@1000000`, `candump -tz can0`。
+### 4. 何をやってもうまく行かないときは最小構成で試す
+プログラムのどこかにバグが仕込まれている可能性があるので、最小構成のプログラムで試してみましょう。  
+cansendやcandumpで直接CAN通信をして、基板もしくはROS 2ノードの動作を確認するのも有用です。  
 
 ## monitor_regの設定例
 GPIO基板は単一の64bitマスク（`monitor_reg`）で周期送信するレジスタ群を指定します。
@@ -140,7 +134,7 @@ monitor_periodはms指定。周波数f[Hz]で送りたい場合は `monitor_peri
 基本的に、INPUTのときはこの設定にすればすべてのピンの状態が読めるようになります。  
 ロボマス制御基板とは違って1度のパケットにすべてのピンの情報が収まっているので、使っていないピンのデータを送るか、送らないかを考慮する必要もありません。  
 gpio_node側でINPUTのときはPORT_INT_ENを有効になるようにしているので、monitor_periodが遅くてデータを読み飛ばしてしまうことはありません。  
-値が変化したときはmonitor_periodの周期じゃないときでも値は送信されます。
+値が変化したときはmonitor_periodの周期でなくても値は送信されます。
 - reg = `0x4`（`PORT_READ`=0x4）
 ```bash
 ros2 param set /sabacan_gpio_node monitor_reg 0x4

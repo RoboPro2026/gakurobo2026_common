@@ -190,33 +190,26 @@ ros2 service call /sabacan_robomas_reset sabacan_msgs/srv/SabacanReset '{}'
 - `motor_number` の指定ミスに注意。`sabacan_robomas_status<board_id>` で該当番号の状態を確認。
 - VESC使用時は `control_type` でVESCモードが正しく切り替わることを確認。
 
-### 4. 位置やアブソ値が不正/逆回転に見える
-- `abs_enc_en` が必要なチャンネルだけ有効か確認。
-- 変速機構がある場合は `abs_gear_ratio` を設定。回転方向が反転する場合は負の値にする。
-- アブソカウント初期化: 必要に応じて `abs_turn_cnt` を設定するか、`/sabacan_robomas_reset` を実行。
-
-### 5. パラメータを書いた直後に取りこぼしが起きる
+### 4. パラメータを書いた直後に取りこぼしが起きる
 - 起動直後の大量設定は基板側で取りこぼす場合があります。本ノードは送信毎に約10msのディレイを入れていますが、外部から大量に `ros2 param set` やサービス呼び出しを連打しないでください。必要なら自分の側でも10ms程度の待ちを入れる。
 
-### 6. ROSの確認コマンド（切り分けに便利）
-- ノード/トピック確認: `ros2 node list`, `ros2 topic list`, `ros2 topic echo /sabacan_robomas_status0`。
-- 送信周期確認: `ros2 topic hz /sabacan_robomas_ref0`。
-- パラメータ確認: `ros2 param list`, `ros2 param get /sabacan_robomasv2_node control_type`。
-- リセット: `ros2 service call /sabacan_robomas_reset sabacan_msgs/srv/SabacanReset '{}'`（現在のROSパラメータを基板に再送）。
-
-### 7. CANレイヤの確認コマンド
+### 5. CANレイヤの確認コマンド
 - インタフェース: `ip -details -statistics link show can0`（ビットレート/エラーカウンタ）。
 - バス負荷: `canbusload can0@1000000`。
 - 生の受信確認: `candump -tz can0`（エラーが増える、全く流れない、IDが想定外などを確認）。
 
-### 8. ログが多すぎて処理が重い
+### 6. ログが多すぎて処理が重い
 - 起動オプションでログを下げる: `--ros-args --log-level warn`。ログ出力はCPU/IO負荷になるため、デバッグ以外では抑制を推奨。
 
-### 9. ハードウェアの要点（最終チェック）
+### 7. ハードウェアの要点（最終チェック）
 - これが一番よくあるミスです。
 - 終端抵抗: バス両端に120Ω（合成で約60Ω）。基板のジャンパで切替可能。
 - 配線: ツイストペア推奨、GND共通、配線長は必要最小限に。
 - 速度: 標準は1Mbps。全機器を同一設定に。
+
+### 8. 何をやってもうまく行かないときは最小構成で試す
+プログラムのどこかにバグが仕込まれている可能性があるので、最小構成のプログラムで試してみましょう。  
+cansendやcandumpで直接CAN通信をして、基板もしくはROS 2ノードの動作を確認するのも有用です。  
 
 ## monitor_regの設定例
 monitor_regは各モータごとの64bitビットマスクです。配列はモータ0〜3の順。
