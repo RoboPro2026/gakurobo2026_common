@@ -95,6 +95,8 @@ ros2 run sabacan sabacan_robomasv2_node --ros-args -p board_id:=0 \
   * `monitor_reg2` (int64配列): 周期送信するレジスタのビットマスク (上位64bit)。
       * **初期値 (各要素)**: `(1<<2) | (1<<3) | (1<<4)` (VESC\_VOLTAGE, VESC\_CURRENT, VESC\_ERPM)。
 
+monitor_reg周りでトラブルが発生したら、トラブルシューティングの項を参考にすること。
+
 ## 3\. モーターへの指令 (トピック)
 
 `/sabacan_robomas_ref<board_id>` トピックに `SabacanRobomasRef` メッセージを送信します。
@@ -156,3 +158,207 @@ ros2 run sabacan sabacan_robomasv2_node --ros-args -p board_id:=0 \
 ```bash
 ros2 service call /sabacan_robomas_reset sabacan_msgs/srv/SabacanReset '{}'
 ```
+
+## トラブルシューティング
+
+よくある症状ごとに、原因の切り分けと対処をまとめました。手元の配線/設定からROSノード/バス負荷まで、上から順に確認してください。
+
+### 1. ノードは起動するが何もフィードバックが来ない
+- `board_id` 未設定または重複: 起動時に必須です。`ros2 param get /sabacan_robomasv2_node board_id` で確認。
+- CANブリッジ未起動: 本ノードは `/to_can_bus` へ送信し、`/from_can_bus` を購読します。`ros2 topic list | rg can_bus` でトピックが存在するか、CANブリッジ（例: socketcanブリッジ）が動いているかを確認。
+- 物理層: 基板の電源、CAN-H/CAN-L、GNDの共通、終端抵抗（両端120Ω）が正しいかを確認。両端間の抵抗は約60Ωになるのが目安。
+- IF設定: `ip -details -statistics link show can0` で `can0` が `UP` か、ビットレートが期待どおり（例: 1Mbps）かを確認。
+
+### 2. 一部のフィードバック項目だけ欠落する/途切れる
+- バス負荷過多の可能性が高いです。まず負荷を計測:
+  ```bash
+  canbusload can0@1000000
+  # 例) can0@1000000  1015  119400  30560  11%
+  #     2列目=パケット/秒, 5列目=バス負荷(%)
+  ```
+- 目安: 初期設定（monitor_period=50ms, 既定monitor_reg）で基板1枚あたり≒10%（指令100Hz時）。
+- 経験則: 5000 pkt/s を超えるとロスが出やすい。100%超は確実にロス。
+- 対処（効果が高い順）:
+  - `monitor_period` を増やす（例: 50ms→100ms）。デバッグ用途は20〜100Hzで十分。
+  - `monitor_reg1/2` から不要項目を外す（ABS系やVESC系など未使用データを外す）。
+  - 指令トピック `/sabacan_robomas_ref*` の送信周期を落とす（目安≤100Hz）。`ros2 topic hz` で送信周期を確認。
+  - 複数基板に一斉に大量の書き込みをしない。連続で32パケットを超える送信は10ms程度の待ちを入れる。
+
+### 3. 指令は出しているがモータが動かない
+- `motor_type` と `control_type` の組合せを再確認。DJI系は `TORQUE/VELOCITY(PID)/POSITION`、VESCは `DISABLE/PWM/CURRENT/SPEED(PID)/POSITION`。
+- ゲイン/制限値: `speed_gain_*`, `torque_lim`, `pos_gain_*`, `speed_lim` が極端に小さくないか。
+- `motor_number` の指定ミスに注意。`sabacan_robomas_status<board_id>` で該当番号の状態を確認。
+- VESC使用時は `control_type` でVESCモードが正しく切り替わることを確認。
+
+### 4. 位置やアブソ値が不正/逆回転に見える
+- `abs_enc_en` が必要なチャンネルだけ有効か確認。
+- 変速機構がある場合は `abs_gear_ratio` を設定。回転方向が反転する場合は負の値にする。
+- アブソカウント初期化: 必要に応じて `abs_turn_cnt` を設定するか、`/sabacan_robomas_reset` を実行。
+
+### 5. パラメータを書いた直後に取りこぼしが起きる
+- 起動直後の大量設定は基板側で取りこぼす場合があります。本ノードは送信毎に約10msのディレイを入れていますが、外部から大量に `ros2 param set` やサービス呼び出しを連打しないでください。必要なら自分の側でも10ms程度の待ちを入れる。
+
+### 6. ROSの確認コマンド（切り分けに便利）
+- ノード/トピック確認: `ros2 node list`, `ros2 topic list`, `ros2 topic echo /sabacan_robomas_status0`。
+- 送信周期確認: `ros2 topic hz /sabacan_robomas_ref0`。
+- パラメータ確認: `ros2 param list`, `ros2 param get /sabacan_robomasv2_node control_type`。
+- リセット: `ros2 service call /sabacan_robomas_reset sabacan_msgs/srv/SabacanReset '{}'`（現在のROSパラメータを基板に再送）。
+
+### 7. CANレイヤの確認コマンド
+- インタフェース: `ip -details -statistics link show can0`（ビットレート/エラーカウンタ）。
+- バス負荷: `canbusload can0@1000000`。
+- 生の受信確認: `candump -tz can0`（エラーが増える、全く流れない、IDが想定外などを確認）。
+
+### 8. ログが多すぎて処理が重い
+- 起動オプションでログを下げる: `--ros-args --log-level warn`。ログ出力はCPU/IO負荷になるため、デバッグ以外では抑制を推奨。
+
+### 9. ハードウェアの要点（最終チェック）
+- これが一番よくあるミスです。
+- 終端抵抗: バス両端に120Ω（合成で約60Ω）。基板のジャンパで切替可能。
+- 配線: ツイストペア推奨、GND共通、配線長は必要最小限に。
+- 速度: 標準は1Mbps。全機器を同一設定に。
+
+## monitor_regの設定例
+monitor_regは各モータごとの64bitビットマスクです。配列はモータ0〜3の順。
+- reg1対象(0x00〜0x3F): MOTOR_STATE(0x01), TRQ(0x10), SPD(0x20), POS(0x30), ABS_POS(0x3A), ABS_SPD(0x3B), ABS_TURN_CNT(0x3C)
+- reg2対象(0x40〜0x7F): VESC_VOLTAGE(0x42), VESC_CURRENT(0x43), VESC_ERPM(0x44)
+- 計算式: reg1は OR(1 << RegisterID), reg2は OR(1 << (RegisterID - 0x40))
+- 例中はモータ0のみ設定。他は0。必要に応じて各要素へ同じ値を入れてください。
+- 有効化: `enable_monitor_period=true` のときに `monitor_period`/`monitor_reg*` が適用されます（デフォルトtrue）。
+
+monitor_periodの使い分けは、PC側で処理する場合は最大100Hz（10ms）。デバッグ用途は20〜100Hz程度に抑え、CAN負荷を見ながら調整してください。
+
+### 1. SPDをモニターする場合（速度制御の場合）
+- motor_stateあり: reg1 = 0x0000000100000002, reg2 = 0x0（SPD+MOTOR_STATE）
+- motor_stateなし: reg1 = 0x0000000100000000, reg2 = 0x0（SPDのみ）
+```bash
+# motor_stateあり
+ros2 param set /sabacan_robomasv2_node monitor_reg1 "[0x0000000100000002, 0, 0, 0]"
+ros2 param set /sabacan_robomasv2_node monitor_reg2 "[0x0, 0, 0, 0]"
+# motor_stateなし
+ros2 param set /sabacan_robomasv2_node monitor_reg1 "[0x0000000100000000, 0, 0, 0]"
+ros2 param set /sabacan_robomasv2_node monitor_reg2 "[0x0, 0, 0, 0]"
+```
+
+### 2. SPDとTRQをモニターする場合（速度制御調整用）
+- motor_stateあり: reg1 = 0x0000000100010002（SPD+TRQ+MOTOR_STATE）
+- motor_stateなし: reg1 = 0x0000000100010000（SPD+TRQ）
+```bash
+# motor_stateあり
+ros2 param set /sabacan_robomasv2_node monitor_reg1 "[0x0000000100010002, 0, 0, 0]"
+ros2 param set /sabacan_robomasv2_node monitor_reg2 "[0x0, 0, 0, 0]"
+# motor_stateなし
+ros2 param set /sabacan_robomasv2_node monitor_reg1 "[0x0000000100010000, 0, 0, 0]"
+ros2 param set /sabacan_robomasv2_node monitor_reg2 "[0x0, 0, 0, 0]"
+```
+
+### 3. POSをモニターする場合（位置制御の場合）
+- motor_stateあり: reg1 = 0x0001000000000002（POS+MOTOR_STATE）
+- motor_stateなし: reg1 = 0x0001000000000000（POSのみ）
+```bash
+# motor_stateあり
+ros2 param set /sabacan_robomasv2_node monitor_reg1 "[0x0001000000000002, 0, 0, 0]"
+ros2 param set /sabacan_robomasv2_node monitor_reg2 "[0x0, 0, 0, 0]"
+# motor_stateなし
+ros2 param set /sabacan_robomasv2_node monitor_reg1 "[0x0001000000000000, 0, 0, 0]"
+ros2 param set /sabacan_robomasv2_node monitor_reg2 "[0x0, 0, 0, 0]"
+```
+
+### 4. SPDとPOSをモニターする場合（位置制御調整用）
+- motor_stateあり: reg1 = 0x0001000100000002（SPD+POS+MOTOR_STATE）
+- motor_stateなし: reg1 = 0x0001000100000000（SPD+POS）
+```bash
+# motor_stateあり
+ros2 param set /sabacan_robomasv2_node monitor_reg1 "[0x0001000100000002, 0, 0, 0]"
+ros2 param set /sabacan_robomasv2_node monitor_reg2 "[0x0, 0, 0, 0]"
+# motor_stateなし
+ros2 param set /sabacan_robomasv2_node monitor_reg1 "[0x0001000100000000, 0, 0, 0]"
+ros2 param set /sabacan_robomasv2_node monitor_reg2 "[0x0, 0, 0, 0]"
+```
+
+### 5. TRQとSPDとPOSをモニターする場合（位置制御調整用orデバッグ用）
+- motor_stateあり: reg1 = 0x0001000100010002（TRQ+SPD+POS+MOTOR_STATE）
+- motor_stateなし: reg1 = 0x0001000100010000（TRQ+SPD+POS）
+```bash
+# motor_stateあり
+ros2 param set /sabacan_robomasv2_node monitor_reg1 "[0x0001000100010002, 0, 0, 0]"
+ros2 param set /sabacan_robomasv2_node monitor_reg2 "[0x0, 0, 0, 0]"
+# motor_stateなし
+ros2 param set /sabacan_robomasv2_node monitor_reg1 "[0x0001000100010000, 0, 0, 0]"
+ros2 param set /sabacan_robomasv2_node monitor_reg2 "[0x0, 0, 0, 0]"
+```
+
+### 6. ABS_SPDとABS_POSのみを知りたい場合（設置エンコーダなど）
+ABS_POS + ABS_SPD（必要ならMOTOR_STATEも加える）
+- reg1 = 0x0C00000000000000（+MOTOR_STATEで 0x0C00000000000002）, reg2 = 0x0
+```bash
+# motor_state無し
+ros2 param set /sabacan_robomasv2_node monitor_reg1 "[0x0C00000000000000, 0, 0, 0]"
+ros2 param set /sabacan_robomasv2_node monitor_reg2 "[0x0, 0, 0, 0]"
+# motor_stateも入れる場合（推奨）
+ros2 param set /sabacan_robomasv2_node monitor_reg1 "[0x0C00000000000002, 0, 0, 0]"
+ros2 param set /sabacan_robomasv2_node monitor_reg2 "[0x0, 0, 0, 0]"
+```
+
+### 7. VESCのフィードバックデータを100Hzで欲しい場合
+VESC_VOLTAGE + VESC_CURRENT + VESC_ERPM（reg2側）。実機は100Hz未満の可能性あり。
+- reg1 = 0x0, reg2 = 0x1C, monitor_period = 10(ms)
+```bash
+ros2 param set /sabacan_robomasv2_node monitor_reg1 "[0x0, 0, 0, 0]"
+ros2 param set /sabacan_robomasv2_node monitor_reg2 "[0x1C, 0, 0, 0]"
+ros2 param set /sabacan_robomasv2_node monitor_period 10
+```
+
+### 8. モータがつながっているかを知りたいとき
+安全に考慮するなら、常にmotor_stateは送り続けて、falseの場合はロボット全体を止めるみたいな感じにしたほうがいいと思います。
+MOTOR_STATEのみ
+- reg1 = 0x2, reg2 = 0x0
+```bash
+ros2 param set /sabacan_robomasv2_node monitor_reg1 "[0x2, 0, 0, 0]"
+ros2 param set /sabacan_robomasv2_node monitor_reg2 "[0x0, 0, 0, 0]"
+```
+
+### monitor_regの計算方法について
+実際に書き込んだ結果はリトルエンディアンとなるので注意
+補足: 16進指定（0x...）はROS 2のYAMLパーサでintとして解釈されます。10進で指定しても構いません。
+
+#### 対象レジスタIDとビット位置
+- reg1側（0x00〜0x3Fをそのままビット番号として使う）
+  - MOTOR_STATE: 0x01 → ビット1（1<<1 = 0x2）
+  - TRQ: 0x10 → ビット16（1<<16 = 0x0000000000010000）
+  - SPD: 0x20 → ビット32（1<<32 = 0x0000000100000000）
+  - POS: 0x30 → ビット48（1<<48 = 0x0001000000000000）
+  - ABS_POS: 0x3A → ビット58（1<<58 = 0x0400000000000000）
+  - ABS_SPD: 0x3B → ビット59（1<<59 = 0x0800000000000000）
+  - ABS_TURN_CNT: 0x3C → ビット60（1<<60 = 0x1000000000000000）
+- reg2側（0x40〜0x7Fは 0x40 を引いてからビット番号にする）
+  - VESC_VOLTAGE: 0x42 → 0x42-0x40=2 → ビット2（1<<2 = 0x4）
+  - VESC_CURRENT: 0x43 → 3 → ビット3（1<<3 = 0x8）
+  - VESC_ERPM: 0x44 → 4 → ビット4（1<<4 = 0x10）
+
+#### 手計算の例（SPDとMOTOR_STATE）
+1) SPDのIDは0x20=32 → reg1のビット32を立てる → 1<<32 = 4294967296 = 0x0000000100000000
+2) MOTOR_STATEは0x01=1 → 1<<1 = 2 = 0x2
+3) ORで結合 → 0x0000000100000000 | 0x2 = 0x0000000100000002
+
+#### 手計算の例（ABS_POSとABS_SPDのみにする）
+1) ABS_POSは0x3A=58 → 1<<58 = 0x0400000000000000
+2) ABS_SPDは0x3B=59 → 1<<59 = 0x0800000000000000
+3) ORで結合 → 0x0C00000000000000（必要ならMOTOR_STATE=0x2もOR）
+
+#### 手計算の例（VESC系：電圧・電流・ERPM）
+1) それぞれ 0x42,0x43,0x44 なので 0x40 を引いて 2,3,4
+2) reg2で 1<<2=0x4, 1<<3=0x8, 1<<4=0x10
+3) ORで結合 → 0x4|0x8|0x10 = 0x1C（reg2側に設定）
+
+### monitor_periodの計算方法（周波数↔周期）
+- 単位はミリ秒。基板には`monitor_period[ms]`として書き込みます。
+- 周波数`f[Hz]`で送りたい場合の目安: `monitor_period = round(1000 / f)`
+  - 20Hz → 50ms
+  - 50Hz → 20ms
+  - 100Hz → 10ms（上げすぎるとCAN負荷増）
+- 設定範囲: 0〜65535（ms）。0はファーム側で「無効」として扱われる実装が多いです。
+  - 完全に止めたい場合: `enable_monitor_period=true`の状態で`monitor_period=0`を設定、または`monitor_reg1/2`を0にする。
+- パケット目安: 1周期で選択レジスタの数だけCANフレームが出ます。
+  - 例）1モータでSPD+MOTOR_STATEの2項目、100Hzなら 2 × 100 = 200 pkt/s。
+  - 4モータすべて同設定なら 200 × 4 = 800 pkt/s。`canbusload`の値と見比べて調整してください。
