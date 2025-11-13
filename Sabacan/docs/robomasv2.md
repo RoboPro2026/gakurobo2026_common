@@ -355,3 +355,13 @@ ros2 param set /sabacan_robomasv2_node monitor_reg2 "[0x0, 0, 0, 0]"
 - パケット目安: 1周期で選択レジスタの数だけCANフレームが出ます。
   - 例）1モータでSPD+MOTOR_STATEの2項目、100Hzなら 2 × 100 = 200 pkt/s。
   - 4モータすべて同設定なら 200 × 4 = 800 pkt/s。`canbusload`の値と見比べて調整してください。
+
+## その他
+どうして、SabacanRobomasRefやSabacanRobomasStatusの中にmotor_numberが含まれているの？  
+1つの同一トピックにまとめるのではなく、4つ分のトピック用意したほうがスマートじゃない？
+
+A. そのとおりです。しかし、すでにsabacan_msgsに依存するプログラムが多く書かれているので、いまさら変更することができないという、歴史的経緯があります。  
+SabacanRobomasRefとSabacanRobomasStatusはそのままでは扱いにくいので、1モータ1トピックに変換するノードを書いて、使っている人が多いです。  
+
+どうして、入力ピンの論理を反転させる機能はないの？  
+A. sabacan_robomasv2_nodeに反転機能を追加するのが面倒だったし、もっと上位のレイヤーでそういうことはやったほうが扱いやすそうだと思ったから。  

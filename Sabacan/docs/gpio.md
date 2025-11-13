@@ -162,7 +162,17 @@ ros2 param set /sabacan_gpio_node monitor_reg 0x0
 ros2 param set /sabacan_gpio_node monitor_period 0
 ```
 
-### 5. 計算根拠（手計算例）
+### 5. ｓ
 - `PORT_READ`のIDは0x02 → `1<<0x02 = 0x4`
 - `PWM_DUTY`のIDは0x20 → `1<<0x20 = 0x0000000100000000`
 - 結合はOR: 例（2の構成）`0x4 | 0x0000000100000000 = 0x0000000100000004`
+
+## その他
+どうして、SabacanGPIORefやSabacanGpioStatusの中にpin_numberが含まれているの？  
+1つの同一トピックにまとめるのではなく、9つ分のトピック用意したほうがスマートじゃない？
+
+A. そのとおりです。しかし、すでにsabacan_msgsに依存するプログラムが多く書かれているので、いまさら変更することができないという、歴史的経緯があります。  
+SabacanGPIORefとSabacanGPIOStatusはそのままでは扱いにくいので、1モータ1トピックに変換するノードを書いて、使っている人が多いです。  
+
+どうして、入力ピンの論理を反転させる機能はないの？  
+A. sabacan_robomasv2_nodeには回転方向を反転させる機能がないから。sabacan_robomasv2_nodeに反転機能を追加するのが面倒だったし、もっと上位のレイヤーでそういうことはやったほうが扱いやすそうだと思ったから。  
