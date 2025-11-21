@@ -124,7 +124,8 @@ monitor_reg周りでトラブルが発生したら、トラブルシューティ
 `/sabacan_robomas_status<board_id>` トピックで `SabacanRobomasStatus` メッセージが定期的に配信されます。
 
   * **メッセージ:**
-      * `motor_number`, `motor_type`, `control_type`, `motor_state`, `torque`, `speed`, `pos`, `abs_pos`, `abs_speed`, `abs_turn_cnt`, `vesc_voltage`, `vesc_current`, `vesc_erpm`。
+      * `motor_number`, `motor_type`, `control_type`, `motor_state`, `torque`, `speed`, `pos`, `abs_pos`, `abs_speed`, `abs_turn_cnt`, `vesc_voltage`, `vesc_current`, `vesc_rpm`。
+      * VESCのフィードバックデータはerpmが返されるが、扱いにくいので、rpmに変換している。  
   * **例: 状態確認 (board\_id=0)**
     ```bash
     ros2 topic echo /sabacan_robomas_status0

@@ -298,7 +298,8 @@ private:
       msg.abs_turn_cnt = robomas_driver_->abs_turn_cnt[i];
       msg.vesc_voltage = robomas_driver_->vesc_voltage[i];
       msg.vesc_current = robomas_driver_->vesc_current[i];
-      msg.vesc_erpm = robomas_driver_->vesc_erpm[i];
+      // rpm = erpm / (p / 2)
+      msg.vesc_rpm = robomas_driver_->vesc_erpm[i] / (vesc_pole_[i] / 2.0);
       sabacan_status_publisher_->publish(msg);
       // RCLCPP_INFO(this->get_logger(), "Published SabacanRobomasStatus%ld, motor_number = %d",
       // board_id_, i);
@@ -337,7 +338,8 @@ private:
       "monitor_period",
       "monitor_reg1",
       "monitor_reg2",
-      "enable_monitor_period"};
+      "enable_monitor_period"
+    };
     // clang-format on
 
     for (size_t i = 0; i < param_name.size(); i++) {
