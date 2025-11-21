@@ -58,6 +58,7 @@ public:
     this->declare_parameter("pos_gain_d", std::vector<double>{0.0, 0.0, 0.0, 0.0});
     this->declare_parameter("speed_lim", std::vector<double>{30.0, 30.0, 30.0, 30.0});
     this->declare_parameter("abs_turn_cnt", std::vector<int64_t>{0, 0, 0, 0});
+    this->declare_parameter("vesc_pole", std::vector<int64_t>{14, 14, 14, 14});
     // モニター機能のパラメータ
     // デフォルトでは20Hz(50ms)で、MOTOR_STATE、TRQ、SPD、POS、ABS_POS、ABS_SPD、ABS_TURN_CNT、VESC_VOLTAGE、VESC_CURRENT、VESC_ERPMを送信
     this->declare_parameter("monitor_period", 50);
@@ -267,7 +268,13 @@ private:
           break;
       }
     } else if (is_vesc) {
-      robomas_driver_->setVescTarget(msg->motor_number, msg->ref);
+      if (vesc_mode_[msg->motor_number] == RobomasV2::VESC_MODE_SPEED)
+        // VESCの速度指令はrpmではなくerpmであるので、rpmに変換
+        // erpm = rpm * (p / 2)
+        robomas_driver_->setVescTarget(
+          msg->motor_number, msg->ref * (vesc_pole_[msg->motor_number] / 2.0));  // rpm to erpm
+      else
+        robomas_driver_->setVescTarget(msg->motor_number, msg->ref);
     }
 
     RCLCPP_INFO(
@@ -305,6 +312,7 @@ private:
   void robomas_init()
   {
     // 初期化用パラメータ
+    // clang-format off
     std::vector<std::string> param_name{
       "motor_type",
       "control_type",
@@ -325,10 +333,12 @@ private:
       "pos_gain_d",
       "speed_lim",
       "abs_turn_cnt",
+      "vesc_pole",
       "monitor_period",
       "monitor_reg1",
       "monitor_reg2",
       "enable_monitor_period"};
+    // clang-format on
 
     for (size_t i = 0; i < param_name.size(); i++) {
       update_parameters(this->get_parameter(param_name[i]));
@@ -640,6 +650,9 @@ private:
       if ((ret = check_size(tmp_param, N, name)))
         for (int i = 0; i < N; i++)
           robomas_driver_->setAbsTurnCnt(i, abs_turn_cnt_[i] = tmp_param[i]);
+    } else if (name == "vesc_pole") {
+      auto tmp_param = parameter.as_integer_array();
+      if ((ret = check_size(tmp_param, N, name))) vesc_pole_ = tmp_param;
     } else if (name == "monitor_period") {
       auto tmp_param = parameter.as_int();
       if ((ret = check_data_range<int64_t>(tmp_param, 0, 65536, name))) {
@@ -713,6 +726,7 @@ private:
   std::vector<double> pos_gain_d_ = std::vector<double>(N);
   std::vector<double> speed_lim_ = std::vector<double>(N);
   std::vector<int64_t> abs_turn_cnt_ = std::vector<int64_t>(N);
+  std::vector<int64_t> vesc_pole_ = std::vector<int64_t>(N);
   std::vector<int64_t> vesc_mode_ = std::vector<int64_t>(N);
   int64_t monitor_period_;
   std::vector<int64_t> monitor_reg1_ = std::vector<int64_t>(N);

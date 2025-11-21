@@ -86,6 +86,8 @@ ros2 run sabacan sabacan_robomasv2_node --ros-args -p board_id:=0 \
       * **初期値**: `[30.0, 30.0, 30.0, 30.0]`。
   * `abs_turn_cnt` (int64配列): アブソリュートエンコーダの回転数オフセット。
       * **初期値**: `[0, 0, 0, 0]`。
+  * `vesc_pole` (int64配列): VESCのモータの極数。これを正しく設定しないと、速度指令値がerpmなのでおかしくなる。
+      * **初期値**: `[14, 14, 14, 14]`。
   * `monitor_period` (int): 状態フィードバックの送信周期 (ms)。
       * **初期値**: `50`。
   * `enable_monitor_period` (bool): 周期送信の有効/無効。
