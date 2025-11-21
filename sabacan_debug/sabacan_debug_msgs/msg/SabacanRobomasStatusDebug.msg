@@ -1,0 +1,1 @@
+sabacan_msgs/SabacanRobomasStatus[4] status_array

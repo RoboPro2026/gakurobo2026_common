@@ -1,0 +1,1 @@
+sabacan_msgs/SabacanGPIOStatus[8] res_array

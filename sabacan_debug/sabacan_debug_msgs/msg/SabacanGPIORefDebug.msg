@@ -1,0 +1,1 @@
+sabacan_msgs/SabacanGPIORefFloat[8] ref_array

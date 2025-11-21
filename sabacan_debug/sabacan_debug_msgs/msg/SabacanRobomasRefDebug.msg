@@ -1,0 +1,1 @@
+sabacan_msgs/SabacanRobomasRef[4] ref_array
