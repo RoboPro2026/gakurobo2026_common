@@ -260,6 +260,7 @@ public:
 
       pwm_duty_[pin_num] = pwm_duty;
       gpio_driver_->setPwmDuty(pin_num, pwm_duty);
+      delay();
 
       RCLCPP_INFO(
         this->get_logger(), "Set PWM duty for pin %d: ref_float=%f, pwm_period=%d, pwm_duty=%d",
@@ -301,6 +302,7 @@ public:
       }
       pwm_duty_[pin_num] = esc_value;
       gpio_driver_->setPwmDuty(pin_num, esc_value);
+      delay();
 
       RCLCPP_INFO(
         this->get_logger(), "Set ESC value for pin %d: ref_int=%d, esc_value=%d", pin_num,
@@ -358,12 +360,21 @@ public:
   {
     std::vector<std::string> param_name{
       "pin_type", "pwm_freq", "monitor_period", "enable_monitor_period", "monitor_reg"};
+
+    rclcpp::Time start_time = this->get_clock()->now();
+
     for (size_t i = 0; i < param_name.size(); i++) {
+      // update_parameters関数内ではdelayが入っている。
       update_parameters(this->get_parameter(param_name[i]));
-      // このdelayがないと、うまく動かないときがある
-      std::this_thread::sleep_for(10ms);
     }
+
+    rclcpp::Time end_time = this->get_clock()->now();
+    RCLCPP_INFO(
+      this->get_logger(), "GPIO initialization completed in %.3f seconds",
+      (end_time - start_time).seconds());
   }
+
+  void delay() { std::this_thread::sleep_for(10ms); }
 
   bool update_parameters(rclcpp::Parameter parameter)
   {
@@ -393,6 +404,7 @@ public:
 
       // 安全のため、出力をOFFにする。dutyは書き換えない。
       gpio_driver_->setPortWrite(0x000);
+      delay();
       uint16_t port_mode = 0x000;
       uint16_t int_en = 0x000;
       uint16_t esc_mode_en = 0x000;
@@ -416,14 +428,19 @@ public:
       }
       // 出力に設定
       gpio_driver_->setPortMode(port_mode);
+      delay();
       gpio_driver_->setPortIntEn(int_en);
+      delay();
       gpio_driver_->setEscModeEn(esc_mode_en);
+      delay();
       // 出力のdutyを設定、初期値がなぜか0xFFFFとなっているので
       for (size_t i = 0; i < N; i++) {
         gpio_driver_->setPwmDuty(i, pwm_duty_[i]);
+        delay();
       }
       // 設定が完了したから、出力を有効にする
       gpio_driver_->setPortWrite(port_write);
+      delay();
 
     } else if (name == "pwm_freq") {
       auto tmp_param = parameter.as_integer_array();
@@ -447,24 +464,30 @@ public:
       // pwm_periodをCANデバイスに送信
       for (size_t i = 0; i < N; i++) {
         gpio_driver_->setPwmPeriod(i, pwm_period[i]);
+        delay();
       }
     } else if (name == "monitor_period") {
       int64_t tmp_param = parameter.as_int();
       if (check_data_range<int64_t>(tmp_param, 0, inf, name) == false) return false;
       monitor_period_ = tmp_param;
       gpio_driver_->setMonitorPeriod(static_cast<uint16_t>(monitor_period_));
+      delay();
     } else if (name == "enable_monitor_period") {
       enable_monitor_period_ = parameter.as_bool();
       if (enable_monitor_period_ == false) {
         gpio_driver_->setMonitorPeriod(0);  // 無効化
+        delay();
       } else {
         gpio_driver_->setMonitorPeriod(static_cast<uint16_t>(monitor_period_));
+        delay();
         gpio_driver_->setMonitorReg(static_cast<uint64_t>(monitor_reg_));
+        delay();
       }
     } else if (name == "monitor_reg") {
       int64_t tmp_param = parameter.as_int();
       monitor_reg_ = tmp_param;
       gpio_driver_->setMonitorReg(static_cast<uint64_t>(monitor_reg_));
+      delay();
     }
     return ret;
   }
