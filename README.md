@@ -9,6 +9,14 @@ cd ~/ros2_ws/src
 git clone --recurse-submodules https://github.com/RoboPro2026/gakurobo2026_common.git
 ```
 
+## submoduleの更新方法
+```
+# gakurobo2026_commonを更新
+git pull origin main
+# submoduleを更新
+git submodule update --init --recursive
+```
+
 ## CANのセットアップ
 ```
 sudo ./can_setup.bash
