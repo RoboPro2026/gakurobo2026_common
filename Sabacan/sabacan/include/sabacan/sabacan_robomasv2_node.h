@@ -217,7 +217,11 @@ public:
     for (int i = 0; i < 8; i++) {
       msg->data[i] = data[i];
     }
-    RCLCPP_INFO(this->get_logger(), "Sending CAN frame: ID=0x%X", msg->id);
+    RCLCPP_INFO(
+      this->get_logger(),
+      "Sending CAN frame: ID=0x%X, DLC=%d, Data=[%02X %02X %02X %02X %02X %02X %02X %02X]", msg->id,
+      msg->dlc, msg->data[0], msg->data[1], msg->data[2], msg->data[3], msg->data[4], msg->data[5],
+      msg->data[6], msg->data[7]);
     can_publisher_->publish(std::move(msg));
   }
 
@@ -517,11 +521,19 @@ private:
       // motor_typeを更新
       for (size_t i = 0; i < N; i++)
         motor_type_[i] = motor_type_map_[motor_type_name_[i] = tmp_param[i]];
-      // N個のパラメータすべてに問題がなければ、CAN通信で送信
-      for (int i = 0; i < N; i++)
-        robomas_driver_->setControl(
-          i, (uint8_t)control_type_[i], (uint8_t)motor_type_[i], dob_en_[i], abs_enc_en_[i],
-          md_guess_en_[i]);
+
+      for (int i = 0; i < N; i++) {
+        // motor_typeがロボマスのときのみ送信
+        bool is_dji_motor =
+          (motor_type_[i] == RobomasV2::CONTROL_MOTOR_C610 ||
+           motor_type_[i] == RobomasV2::CONTROL_MOTOR_C620);
+        if (is_dji_motor) {
+          robomas_driver_->setControl(
+            i, (uint8_t)control_type_[i], (uint8_t)motor_type_[i], dob_en_[i], abs_enc_en_[i],
+            md_guess_en_[i]);
+        }
+      }
+
     } else if (name == "control_type") {
       auto tmp_param = parameter.as_string_array();
       // パラメータが正しいか確認
@@ -531,13 +543,15 @@ private:
       std::vector<bool> is_dji_motor_map_ok(N);
       std::vector<bool> is_vesc_map_ok(N);
       for (size_t i = 0; i < N; i++) {
+        // モータの種類を判定
         is_dji_motor[i] =
           (motor_type_[i] == RobomasV2::CONTROL_MOTOR_C610 ||
            motor_type_[i] == RobomasV2::CONTROL_MOTOR_C620);
         is_vesc[i] = (motor_type_[i] == RobomasV2::CONTROL_MOTOR_VESC);
+        // 設定したcontrol_typeがモータの種類に対応しているかを確認
         is_dji_motor_map_ok[i] = (is_dji_motor[i] && control_type_map_.contains(tmp_param[i]));
         is_vesc_map_ok[i] = (is_vesc[i] && vesc_mode_map_.contains(tmp_param[i]));
-
+        // 対応していないcontrol_typeの場合はエラー
         if (is_dji_motor_map_ok[i] == false && is_vesc_map_ok[i] == false) {
           ret = false;
           RCLCPP_ERROR(
@@ -545,23 +559,23 @@ private:
         }
       }
       if (ret == false) return ret;
-      // 値を更新
+
       for (size_t i = 0; i < N; i++) {
+        // 変数を更新
         control_type_name_[i] = tmp_param[i];
         if (is_dji_motor_map_ok[i]) {
+          // control_typeを更新、vesc_modeはVESC_MODE_DISABLEに設定
           control_type_[i] = control_type_map_[control_type_name_[i]];
           vesc_mode_[i] = RobomasV2::VESC_MODE_DISABLE;
         } else if (is_vesc_map_ok[i]) {
           // control_typeは設定せず、vesc_modeのみ設定
           vesc_mode_[i] = vesc_mode_map_[control_type_name_[i]];
         }
-        // N個のパラメータすべてに問題がなければ、CAN通信で送信
-        for (int i = 0; i < N; i++) {
-          robomas_driver_->setControl(
-            i, (uint8_t)control_type_[i], (uint8_t)motor_type_[i], dob_en_[i], abs_enc_en_[i],
-            md_guess_en_[i]);
-          robomas_driver_->setVescMode(i, vesc_mode_[i]);
-        }
+        // 設定を送信
+        robomas_driver_->setControl(
+          i, (uint8_t)control_type_[i], (uint8_t)motor_type_[i], dob_en_[i], abs_enc_en_[i],
+          md_guess_en_[i]);
+        robomas_driver_->setVescMode(i, vesc_mode_[i]);
       }
     } else if (name == "dob_en") {
       auto tmp_param = parameter.as_bool_array();
