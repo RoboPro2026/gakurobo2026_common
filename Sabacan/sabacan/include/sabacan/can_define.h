@@ -46,6 +46,7 @@ constexpr uint8_t DENGEN = 0x1;
 constexpr uint8_t ROBOMAS_V1 = 0x2;
 constexpr uint8_t GPIO = 0x3;
 constexpr uint8_t ROBOMAS_V2 = 0x4;
+constexpr uint8_t LED = 0x5;
 constexpr uint8_t FORCE_READ = 0xF;
 };  // namespace DataType
 

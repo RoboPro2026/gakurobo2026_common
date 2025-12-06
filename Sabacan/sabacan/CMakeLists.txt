@@ -13,17 +13,24 @@ find_package(std_msgs REQUIRED)
 find_package(sabacan_msgs REQUIRED)
 
 # Add executable
+add_executable(sabacan_check_id_rq_node example/sabacan_check_id_rq_node.cpp)
 add_executable(sabacan_gpio_node src/sabacan_gpio_node.cpp)
 add_executable(sabacan_power_node src/sabacan_power_node.cpp)
 add_executable(sabacan_robomas_node src/sabacan_robomas_node.cpp)
 add_executable(sabacan_robomasv2_node src/sabacan_robomasv2_node.cpp)
 
+ament_target_dependencies(sabacan_check_id_rq_node rclcpp can_msgs std_msgs sabacan_msgs)
 ament_target_dependencies(sabacan_gpio_node rclcpp can_msgs std_msgs sabacan_msgs)
 ament_target_dependencies(sabacan_power_node rclcpp can_msgs std_msgs sabacan_msgs)
 ament_target_dependencies(sabacan_robomas_node rclcpp can_msgs std_msgs sabacan_msgs)
 ament_target_dependencies(sabacan_robomasv2_node rclcpp can_msgs std_msgs sabacan_msgs)
 
 # インクルードディレクトリを設定
+target_include_directories(sabacan_check_id_rq_node PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+
 target_include_directories(sabacan_gpio_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
@@ -46,6 +53,7 @@ target_include_directories(sabacan_robomasv2_node PUBLIC
 
 # Install targets
 install(TARGETS
+  sabacan_check_id_rq_node
   sabacan_gpio_node
   sabacan_power_node
   sabacan_robomas_node
