@@ -58,6 +58,7 @@ public:
     this->declare_parameter("pos_gain_d", std::vector<double>{0.0, 0.0, 0.0, 0.0});
     this->declare_parameter("speed_lim", std::vector<double>{30.0, 30.0, 30.0, 30.0});
     this->declare_parameter("abs_turn_cnt", std::vector<int64_t>{0, 0, 0, 0});
+    this->declare_parameter("vesc_pole", std::vector<int64_t>{14, 14, 14, 14});
     // モニター機能のパラメータ
     // デフォルトでは20Hz(50ms)で、MOTOR_STATE、TRQ、SPD、POS、ABS_POS、ABS_SPD、ABS_TURN_CNT、VESC_VOLTAGE、VESC_CURRENT、VESC_ERPMを送信
     this->declare_parameter("monitor_period", 50);
@@ -216,7 +217,11 @@ public:
     for (int i = 0; i < 8; i++) {
       msg->data[i] = data[i];
     }
-    RCLCPP_INFO(this->get_logger(), "Sending CAN frame: ID=0x%X", msg->id);
+    RCLCPP_INFO(
+      this->get_logger(),
+      "Sending CAN frame: ID=0x%X, DLC=%d, Data=[%02X %02X %02X %02X %02X %02X %02X %02X]", msg->id,
+      msg->dlc, msg->data[0], msg->data[1], msg->data[2], msg->data[3], msg->data[4], msg->data[5],
+      msg->data[6], msg->data[7]);
     can_publisher_->publish(std::move(msg));
   }
 
@@ -267,7 +272,15 @@ private:
           break;
       }
     } else if (is_vesc) {
-      robomas_driver_->setVescTarget(msg->motor_number, msg->ref);
+      if (vesc_mode_[msg->motor_number] == RobomasV2::VESC_MODE_SPEED) {
+        // rad/sからrpmに変換
+        double rpm = msg->ref * (60.0 / (2.0 * M_PI));
+        // rpmからVESCの指令値であるerpmに変換
+        // erpm = rpm * (p / 2)
+        double erpm = rpm * (vesc_pole_[msg->motor_number] / 2.0);
+        robomas_driver_->setVescTarget(msg->motor_number, erpm);  // rpm to erpm
+      } else
+        robomas_driver_->setVescTarget(msg->motor_number, msg->ref);
     }
 
     RCLCPP_INFO(
@@ -291,12 +304,23 @@ private:
       msg.abs_turn_cnt = robomas_driver_->abs_turn_cnt[i];
       msg.vesc_voltage = robomas_driver_->vesc_voltage[i];
       msg.vesc_current = robomas_driver_->vesc_current[i];
-      msg.vesc_erpm = robomas_driver_->vesc_erpm[i];
+      // VESCの生データerpmからrpmに変換
+      // rpm = erpm / (p / 2)
+      double rpm = robomas_driver_->vesc_erpm[i] / (vesc_pole_[i] / 2.0);
+      // rpmからrad/sに変換
+      double rad_s = rpm * (2.0 * M_PI / 60.0);
+      msg.vesc_speed = rad_s;
       sabacan_status_publisher_->publish(msg);
       // RCLCPP_INFO(this->get_logger(), "Published SabacanRobomasStatus%ld, motor_number = %d",
       // board_id_, i);
     }
   }
+
+  /**
+   * @brief 遅延処理。送信と送信の間などに使用する
+   * 
+   */
+  void delay() { std::this_thread::sleep_for(10ms); }
 
   /**
    * @brief 初期化命令を基板に送信する
@@ -305,6 +329,7 @@ private:
   void robomas_init()
   {
     // 初期化用パラメータ
+    // clang-format off
     std::vector<std::string> param_name{
       "motor_type",
       "control_type",
@@ -325,16 +350,26 @@ private:
       "pos_gain_d",
       "speed_lim",
       "abs_turn_cnt",
+      "vesc_pole",
       "monitor_period",
       "monitor_reg1",
       "monitor_reg2",
-      "enable_monitor_period"};
+      "enable_monitor_period"
+    };
+    // clang-format on
+
+    rclcpp::Time start_time = this->get_clock()->now();
 
     for (size_t i = 0; i < param_name.size(); i++) {
+      // update_parametersの中では、CANのデータを1つ送信するごとにdelayを読んでいる。
+      // 負荷軽減のため。
       update_parameters(this->get_parameter(param_name[i]));
-      // このdelayがないと、うまく動かないときがある
-      std::this_thread::sleep_for(10ms);
     }
+
+    rclcpp::Time end_time = this->get_clock()->now();
+    RCLCPP_INFO(
+      this->get_logger(), "RobomasV2 initialization completed in %.3f seconds",
+      (end_time - start_time).seconds());
   }
 
   // パラメータ変更コールバック
@@ -390,8 +425,11 @@ private:
         load_d_[n] = request->dob_load_d;
         dob_cf_[n] = request->dob_cutoff_freq;
         robomas_driver_->setLoad_J(n, load_j_[n]);
+        delay();
         robomas_driver_->setLoad_D(n, load_d_[n]);
+        delay();
         robomas_driver_->setDob_CF(n, dob_cf_[n]);
+        delay();
         this->set_parameter(rclcpp::Parameter("load_j", load_j_));
         this->set_parameter(rclcpp::Parameter("load_d", load_d_));
         this->set_parameter(rclcpp::Parameter("dob_cf", dob_cf_));
@@ -408,9 +446,13 @@ private:
         speed_gain_d_[n] = request->speed_gain_d;
         torque_lim_[n] = request->torque_lim;
         robomas_driver_->setSpeedGainP(n, speed_gain_p_[n]);
+        delay();
         robomas_driver_->setSpeedGainI(n, speed_gain_i_[n]);
+        delay();
         robomas_driver_->setSpeedGainD(n, speed_gain_d_[n]);
+        delay();
         robomas_driver_->setTorqueLimit(n, torque_lim_[n]);
+        delay();
         this->set_parameter(rclcpp::Parameter("speed_gain_p", speed_gain_p_));
         this->set_parameter(rclcpp::Parameter("speed_gain_i", speed_gain_i_));
         this->set_parameter(rclcpp::Parameter("speed_gain_d", speed_gain_d_));
@@ -429,15 +471,20 @@ private:
         speed_lim_[n] = request->speed_lim;
 
         robomas_driver_->setPosGainP(n, pos_gain_p_[n]);
+        delay();
         robomas_driver_->setPosGainI(n, pos_gain_i_[n]);
+        delay();
         robomas_driver_->setPosGainD(n, pos_gain_d_[n]);
+        delay();
         robomas_driver_->setSpeedLim(n, speed_lim_[n]);
+        delay();
         this->set_parameter(rclcpp::Parameter("speed_lim", speed_lim_));
       }
 
       if (request->set_abs_turn_cnt) {
         abs_turn_cnt_[n] = request->abs_turn_cnt;
         robomas_driver_->setAbsTurnCnt(n, abs_turn_cnt_[n]);
+        delay();
       }
 
       response->success = true;
@@ -505,11 +552,20 @@ private:
       // motor_typeを更新
       for (size_t i = 0; i < N; i++)
         motor_type_[i] = motor_type_map_[motor_type_name_[i] = tmp_param[i]];
-      // N個のパラメータすべてに問題がなければ、CAN通信で送信
-      for (int i = 0; i < N; i++)
-        robomas_driver_->setControl(
-          i, (uint8_t)control_type_[i], (uint8_t)motor_type_[i], dob_en_[i], abs_enc_en_[i],
-          md_guess_en_[i]);
+
+      for (int i = 0; i < N; i++) {
+        // motor_typeがロボマスのときのみ送信
+        bool is_dji_motor =
+          (motor_type_[i] == RobomasV2::CONTROL_MOTOR_C610 ||
+           motor_type_[i] == RobomasV2::CONTROL_MOTOR_C620);
+        if (is_dji_motor) {
+          robomas_driver_->setControl(
+            i, (uint8_t)control_type_[i], (uint8_t)motor_type_[i], dob_en_[i], abs_enc_en_[i],
+            md_guess_en_[i]);
+          delay();
+        }
+      }
+
     } else if (name == "control_type") {
       auto tmp_param = parameter.as_string_array();
       // パラメータが正しいか確認
@@ -519,13 +575,15 @@ private:
       std::vector<bool> is_dji_motor_map_ok(N);
       std::vector<bool> is_vesc_map_ok(N);
       for (size_t i = 0; i < N; i++) {
+        // モータの種類を判定
         is_dji_motor[i] =
           (motor_type_[i] == RobomasV2::CONTROL_MOTOR_C610 ||
            motor_type_[i] == RobomasV2::CONTROL_MOTOR_C620);
         is_vesc[i] = (motor_type_[i] == RobomasV2::CONTROL_MOTOR_VESC);
+        // 設定したcontrol_typeがモータの種類に対応しているかを確認
         is_dji_motor_map_ok[i] = (is_dji_motor[i] && control_type_map_.contains(tmp_param[i]));
         is_vesc_map_ok[i] = (is_vesc[i] && vesc_mode_map_.contains(tmp_param[i]));
-
+        // 対応していないcontrol_typeの場合はエラー
         if (is_dji_motor_map_ok[i] == false && is_vesc_map_ok[i] == false) {
           ret = false;
           RCLCPP_ERROR(
@@ -533,137 +591,211 @@ private:
         }
       }
       if (ret == false) return ret;
-      // 値を更新
+
       for (size_t i = 0; i < N; i++) {
+        // 変数を更新
         control_type_name_[i] = tmp_param[i];
         if (is_dji_motor_map_ok[i]) {
+          // control_typeを更新、vesc_modeはVESC_MODE_DISABLEに設定
           control_type_[i] = control_type_map_[control_type_name_[i]];
           vesc_mode_[i] = RobomasV2::VESC_MODE_DISABLE;
         } else if (is_vesc_map_ok[i]) {
           // control_typeは設定せず、vesc_modeのみ設定
           vesc_mode_[i] = vesc_mode_map_[control_type_name_[i]];
         }
-        // N個のパラメータすべてに問題がなければ、CAN通信で送信
-        for (int i = 0; i < N; i++) {
-          robomas_driver_->setControl(
-            i, (uint8_t)control_type_[i], (uint8_t)motor_type_[i], dob_en_[i], abs_enc_en_[i],
-            md_guess_en_[i]);
-          robomas_driver_->setVescMode(i, vesc_mode_[i]);
-        }
+        // 設定を送信
+        // control_typeが切り替わったときは、急いでいる可能性があるので、delayは入れない
+        robomas_driver_->setControl(
+          i, (uint8_t)control_type_[i], (uint8_t)motor_type_[i], dob_en_[i], abs_enc_en_[i],
+          md_guess_en_[i]);
+        robomas_driver_->setVescMode(i, vesc_mode_[i]);
       }
     } else if (name == "dob_en") {
       auto tmp_param = parameter.as_bool_array();
       if ((ret = check_size(tmp_param, N, name))) {
         dob_en_ = tmp_param;
-        for (int i = 0; i < N; i++)
+        for (int i = 0; i < N; i++) {
           robomas_driver_->setControl(
             i, (uint8_t)control_type_[i], (uint8_t)motor_type_[i], dob_en_[i], abs_enc_en_[i],
             md_guess_en_[i]);
+          delay();
+        }
       }
     } else if (name == "abs_enc_en") {
       auto tmp_param = parameter.as_bool_array();
       if ((ret = check_size(tmp_param, N, name))) {
         abs_enc_en_ = tmp_param;
-        for (int i = 0; i < N; i++)
+        for (int i = 0; i < N; i++) {
           robomas_driver_->setControl(
             i, (uint8_t)control_type_[i], (uint8_t)motor_type_[i], dob_en_[i], abs_enc_en_[i],
             md_guess_en_[i]);
+          delay();
+        }
       }
     } else if (name == "md_guess_en") {
       auto tmp_param = parameter.as_bool_array();
       if ((ret = check_size(tmp_param, N, name))) {
         md_guess_en_ = tmp_param;
-        for (int i = 0; i < N; i++)
+        for (int i = 0; i < N; i++) {
           robomas_driver_->setControl(
             i, (uint8_t)control_type_[i], (uint8_t)motor_type_[i], dob_en_[i], abs_enc_en_[i],
             md_guess_en_[i]);
+          delay();
+        }
       }
     } else if (name == "abs_gear_ratio") {
       auto tmp_param = parameter.as_double_array();
-      if ((ret = check_data_range_and_size(tmp_param, 0.0, inf, N, name)))
-        for (int i = 0; i < N; i++)
+      if ((ret = check_data_range_and_size(tmp_param, 0.0, inf, N, name))) {
+        for (int i = 0; i < N; i++) {
           robomas_driver_->setAbsGearRatio(i, abs_gear_ratio_[i] = tmp_param[i]);
+          delay();
+        }
+      }
     } else if (name == "cal_rq") {
       auto tmp_param = parameter.as_bool_array();
-      if ((ret = check_size(tmp_param, N, name)))
-        for (int i = 0; i < N; i++) robomas_driver_->setCalRq(i, cal_rq_[i] = tmp_param[i]);
+      if ((ret = check_size(tmp_param, N, name))) {
+        for (int i = 0; i < N; i++) {
+          robomas_driver_->setCalRq(i, cal_rq_[i] = tmp_param[i]);
+          delay();
+        }
+      }
     } else if (name == "load_j") {
       auto tmp_param = parameter.as_double_array();
-      if ((ret = check_data_range_and_size(tmp_param, 0.0, inf, N, name)))
-        for (int i = 0; i < N; i++) robomas_driver_->setLoad_J(i, load_j_[i] = tmp_param[i]);
+      if ((ret = check_data_range_and_size(tmp_param, 0.0, inf, N, name))) {
+        for (int i = 0; i < N; i++) {
+          robomas_driver_->setLoad_J(i, load_j_[i] = tmp_param[i]);
+          delay();
+        }
+      }
     } else if (name == "load_d") {
       auto tmp_param = parameter.as_double_array();
-      if ((ret = check_data_range_and_size(tmp_param, 0.0, inf, N, name)))
-        for (int i = 0; i < N; i++) robomas_driver_->setLoad_D(i, load_d_[i] = tmp_param[i]);
+      if ((ret = check_data_range_and_size(tmp_param, 0.0, inf, N, name))) {
+        for (int i = 0; i < N; i++) {
+          robomas_driver_->setLoad_D(i, load_d_[i] = tmp_param[i]);
+          delay();
+        }
+      }
     } else if (name == "dob_cf") {
       auto tmp_param = parameter.as_double_array();
-      if ((ret = check_data_range_and_size(dob_cf_, 0.0, inf, N, name)))
-        for (int i = 0; i < N; i++) robomas_driver_->setDob_CF(i, dob_cf_[i] = tmp_param[i]);
+      if ((ret = check_data_range_and_size(dob_cf_, 0.0, inf, N, name))) {
+        for (int i = 0; i < N; i++) {
+          robomas_driver_->setDob_CF(i, dob_cf_[i] = tmp_param[i]);
+          delay();
+        }
+      }
     } else if (name == "speed_gain_p") {
       auto tmp_param = parameter.as_double_array();
-      if ((ret = check_size(tmp_param, N, name)))
-        for (int i = 0; i < N; i++)
+      if ((ret = check_size(tmp_param, N, name))) {
+        for (int i = 0; i < N; i++) {
           robomas_driver_->setSpeedGainP(i, speed_gain_p_[i] = tmp_param[i]);
+          delay();
+        }
+      }
     } else if (name == "speed_gain_i") {
       auto tmp_param = parameter.as_double_array();
-      if ((ret = check_size(tmp_param, N, name)))
-        for (int i = 0; i < N; i++)
+      if ((ret = check_size(tmp_param, N, name))) {
+        for (int i = 0; i < N; i++) {
           robomas_driver_->setSpeedGainI(i, speed_gain_i_[i] = tmp_param[i]);
+          delay();
+        }
+      }
     } else if (name == "speed_gain_d") {
       auto tmp_param = parameter.as_double_array();
-      if ((ret = check_size(tmp_param, N, name)))
-        for (int i = 0; i < N; i++)
+      if ((ret = check_size(tmp_param, N, name))) {
+        for (int i = 0; i < N; i++) {
           robomas_driver_->setSpeedGainD(i, speed_gain_d_[i] = tmp_param[i]);
+          delay();
+        }
+      }
     } else if (name == "torque_lim") {
       auto tmp_param = parameter.as_double_array();
-      if ((ret = check_data_range_and_size(tmp_param, 0.0, inf, N, name)))
-        for (int i = 0; i < N; i++)
+      if ((ret = check_data_range_and_size(tmp_param, 0.0, inf, N, name))) {
+        for (int i = 0; i < N; i++) {
           robomas_driver_->setTorqueLimit(i, torque_lim_[i] = tmp_param[i]);
+          delay();
+        }
+      }
     } else if (name == "pos_gain_p") {
       auto tmp_param = parameter.as_double_array();
-      if ((ret = check_size(tmp_param, N, name)))
-        for (int i = 0; i < N; i++) robomas_driver_->setPosGainP(i, pos_gain_p_[i] = tmp_param[i]);
+      if ((ret = check_size(tmp_param, N, name))) {
+        for (int i = 0; i < N; i++) {
+          robomas_driver_->setPosGainP(i, pos_gain_p_[i] = tmp_param[i]);
+          delay();
+        }
+      }
     } else if (name == "pos_gain_i") {
       auto tmp_param = parameter.as_double_array();
-      if ((ret = check_size(tmp_param, N, name)))
-        for (int i = 0; i < N; i++) robomas_driver_->setPosGainI(i, pos_gain_i_[i] = tmp_param[i]);
+      if ((ret = check_size(tmp_param, N, name))) {
+        for (int i = 0; i < N; i++) {
+          robomas_driver_->setPosGainI(i, pos_gain_i_[i] = tmp_param[i]);
+          delay();
+        }
+      }
     } else if (name == "pos_gain_d") {
       auto tmp_param = parameter.as_double_array();
-      if ((ret = check_size(tmp_param, N, name)))
-        for (int i = 0; i < N; i++) robomas_driver_->setPosGainD(i, pos_gain_d_[i] = tmp_param[i]);
+      if ((ret = check_size(tmp_param, N, name))) {
+        for (int i = 0; i < N; i++) {
+          robomas_driver_->setPosGainD(i, pos_gain_d_[i] = tmp_param[i]);
+          delay();
+        }
+      }
     } else if (name == "speed_lim") {
       auto tmp_param = parameter.as_double_array();
-      if ((ret = check_data_range_and_size(tmp_param, 0.0, inf, N, name)))
-        for (int i = 0; i < N; i++) robomas_driver_->setSpeedLim(i, speed_lim_[i] = tmp_param[i]);
+      if ((ret = check_data_range_and_size(tmp_param, 0.0, inf, N, name))) {
+        for (int i = 0; i < N; i++) {
+          robomas_driver_->setSpeedLim(i, speed_lim_[i] = tmp_param[i]);
+          delay();
+        }
+      }
     } else if (name == "abs_turn_cnt") {
       auto tmp_param = parameter.as_integer_array();
-      if ((ret = check_size(tmp_param, N, name)))
-        for (int i = 0; i < N; i++)
+      if ((ret = check_size(tmp_param, N, name))) {
+        for (int i = 0; i < N; i++) {
           robomas_driver_->setAbsTurnCnt(i, abs_turn_cnt_[i] = tmp_param[i]);
+          delay();
+        }
+      }
+    } else if (name == "vesc_pole") {
+      auto tmp_param = parameter.as_integer_array();
+      if ((ret = check_size(tmp_param, N, name))) vesc_pole_ = tmp_param;
     } else if (name == "monitor_period") {
       auto tmp_param = parameter.as_int();
       if ((ret = check_data_range<int64_t>(tmp_param, 0, 65536, name))) {
         monitor_period_ = tmp_param;
-        if (enable_monitor_period_) robomas_driver_->setMonitorPeriod(monitor_period_);
+        if (enable_monitor_period_) {
+          robomas_driver_->setMonitorPeriod(monitor_period_);
+          delay();
+        }
       }
     } else if (name == "monitor_reg1") {
       auto tmp_param = parameter.as_integer_array();
       monitor_reg1_ = tmp_param;
-      if (enable_monitor_period_)
-        for (int i = 0; i < N; i++) robomas_driver_->setMonitorReg1(i, monitor_reg1_[i]);
+      if (enable_monitor_period_) {
+        for (int i = 0; i < N; i++) {
+          robomas_driver_->setMonitorReg1(i, monitor_reg1_[i]);
+          delay();
+        }
+      }
     } else if (name == "monitor_reg2") {
       auto tmp_param = parameter.as_integer_array();
       monitor_reg2_ = tmp_param;
-      if (enable_monitor_period_)
-        for (int i = 0; i < N; i++) robomas_driver_->setMonitorReg2(i, monitor_reg2_[i]);
+      if (enable_monitor_period_) {
+        for (int i = 0; i < N; i++) {
+          robomas_driver_->setMonitorReg2(i, monitor_reg2_[i]);
+          delay();
+        }
+      }
     } else if (name == "enable_monitor_period") {
       auto tmp_param = parameter.as_bool();
       // enable_monitor_periodがtrueの場合のみ、monitor_periodとmonitor_regを設定
       if ((enable_monitor_period_ = tmp_param)) {
         robomas_driver_->setMonitorPeriod(monitor_period_);
+        delay();
         for (int i = 0; i < N; i++) {
           robomas_driver_->setMonitorReg1(i, monitor_reg1_[i]);
+          delay();
           robomas_driver_->setMonitorReg2(i, monitor_reg2_[i]);
+          delay();
         }
       }
     } else {
@@ -713,6 +845,7 @@ private:
   std::vector<double> pos_gain_d_ = std::vector<double>(N);
   std::vector<double> speed_lim_ = std::vector<double>(N);
   std::vector<int64_t> abs_turn_cnt_ = std::vector<int64_t>(N);
+  std::vector<int64_t> vesc_pole_ = std::vector<int64_t>(N);
   std::vector<int64_t> vesc_mode_ = std::vector<int64_t>(N);
   int64_t monitor_period_;
   std::vector<int64_t> monitor_reg1_ = std::vector<int64_t>(N);
