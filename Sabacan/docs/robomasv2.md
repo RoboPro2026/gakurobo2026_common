@@ -124,8 +124,21 @@ monitor_reg周りでトラブルが発生したら、トラブルシューティ
 `/sabacan_robomas_status<board_id>` トピックで `SabacanRobomasStatus` メッセージが定期的に配信されます。
 
   * **メッセージ:**
-      * `motor_number`, `motor_type`, `control_type`, `motor_state`, `torque`, `speed`, `pos`, `abs_pos`, `abs_speed`, `abs_turn_cnt`, `vesc_voltage`, `vesc_current`, `vesc_rpm`。
-      * VESCのフィードバックデータはerpmが返されるが、扱いにくいので、rpmに変換している。  
+    ```
+    uint8 motor_number
+    string motor_type
+    string control_type
+    bool motor_state
+    float32 torque # Nm
+    float32 speed # rad/s
+    float32 pos # rad
+    float32 abs_pos # rad
+    float32 abs_speed # rad/s
+    int32 abs_turn_cnt # turn count
+    float32 vesc_voltage # V
+    float32 vesc_current # A
+    float32 vesc_speed # rad/s
+    ```
   * **例: 状態確認 (board\_id=0)**
     ```bash
     ros2 topic echo /sabacan_robomas_status0
@@ -192,7 +205,7 @@ ros2 service call /sabacan_robomas_reset sabacan_msgs/srv/SabacanReset '{}'
 - ゲイン/制限値: `speed_gain_*`, `torque_lim`, `pos_gain_*`, `speed_lim` が極端に小さくないか。
 - `motor_number` の指定ミスに注意。`sabacan_robomas_status<board_id>` で該当番号の状態を確認。
 - VESC使用時は `control_type` でVESCモードが正しく切り替わることを確認。
-
+  - VESCの速度制御モードの場合、指令値が小さいと回らないことがある。必要に応じてVESC TOOLで設定を確認すること。
 ### 4. パラメータを書いた直後に取りこぼしが起きる
 - 起動直後の大量設定は基板側で取りこぼす場合があります。本ノードは送信毎に約10msのディレイを入れていますが、外部から大量に `ros2 param set` やサービス呼び出しを連打しないでください。必要なら自分の側でも10ms程度の待ちを入れる。
 

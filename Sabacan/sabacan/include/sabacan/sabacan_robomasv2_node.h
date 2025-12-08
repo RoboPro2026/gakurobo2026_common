@@ -272,12 +272,14 @@ private:
           break;
       }
     } else if (is_vesc) {
-      if (vesc_mode_[msg->motor_number] == RobomasV2::VESC_MODE_SPEED)
-        // VESCの速度指令はrpmではなくerpmであるので、rpmに変換
+      if (vesc_mode_[msg->motor_number] == RobomasV2::VESC_MODE_SPEED) {
+        // rad/sからrpmに変換
+        double rpm = msg->ref * (60.0 / (2.0 * M_PI));
+        // rpmからVESCの指令値であるerpmに変換
         // erpm = rpm * (p / 2)
-        robomas_driver_->setVescTarget(
-          msg->motor_number, msg->ref * (vesc_pole_[msg->motor_number] / 2.0));  // rpm to erpm
-      else
+        double erpm = rpm * (vesc_pole_[msg->motor_number] / 2.0);
+        robomas_driver_->setVescTarget(msg->motor_number, erpm);  // rpm to erpm
+      } else
         robomas_driver_->setVescTarget(msg->motor_number, msg->ref);
     }
 
@@ -302,8 +304,12 @@ private:
       msg.abs_turn_cnt = robomas_driver_->abs_turn_cnt[i];
       msg.vesc_voltage = robomas_driver_->vesc_voltage[i];
       msg.vesc_current = robomas_driver_->vesc_current[i];
+      // VESCの生データerpmからrpmに変換
       // rpm = erpm / (p / 2)
-      msg.vesc_rpm = robomas_driver_->vesc_erpm[i] / (vesc_pole_[i] / 2.0);
+      double rpm = robomas_driver_->vesc_erpm[i] / (vesc_pole_[i] / 2.0);
+      // rpmからrad/sに変換
+      double rad_s = rpm * (2.0 * M_PI / 60.0);
+      msg.vesc_speed = rad_s;
       sabacan_status_publisher_->publish(msg);
       // RCLCPP_INFO(this->get_logger(), "Published SabacanRobomasStatus%ld, motor_number = %d",
       // board_id_, i);

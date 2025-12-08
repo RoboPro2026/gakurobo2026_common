@@ -45,7 +45,7 @@
   int32 abs_turn_cnt
   float32 vesc_voltage
   float32 vesc_current
-  float32 vesc_rpm
+  float32 vesc_speed
   ```
 
 # 制御モード
