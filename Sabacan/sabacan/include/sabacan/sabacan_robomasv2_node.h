@@ -44,7 +44,6 @@ public:
     this->declare_parameter("abs_enc_en", std::vector<bool>{false, false, false, false});
     this->declare_parameter("md_guess_en", std::vector<bool>{false, false, false, false});
     this->declare_parameter("abs_gear_ratio", std::vector<double>{1.0, 1.0, 1.0, 1.0});
-    this->declare_parameter("cal_rq", std::vector<bool>{false, false, false, false});
     this->declare_parameter("load_j", std::vector<double>{0.0005, 0.0005, 0.0005, 0.0005});
     this->declare_parameter("load_d", std::vector<double>{0.0004, 0.0004, 0.0004, 0.0004});
     this->declare_parameter("dob_cf", std::vector<double>{5.0, 5.0, 5.0, 5.0});
@@ -337,7 +336,6 @@ private:
       "abs_enc_en",
       "md_guess_en",
       "abs_gear_ratio",
-      "cal_rq",
       "load_j",
       "load_d",
       "dob_cf",
@@ -651,14 +649,6 @@ private:
           delay();
         }
       }
-    } else if (name == "cal_rq") {
-      auto tmp_param = parameter.as_bool_array();
-      if ((ret = check_size(tmp_param, N, name))) {
-        for (int i = 0; i < N; i++) {
-          robomas_driver_->setCalRq(i, cal_rq_[i] = tmp_param[i]);
-          delay();
-        }
-      }
     } else if (name == "load_j") {
       auto tmp_param = parameter.as_double_array();
       if ((ret = check_data_range_and_size(tmp_param, 0.0, inf, N, name))) {
@@ -832,7 +822,6 @@ private:
   std::vector<bool> abs_enc_en_ = std::vector<bool>(N);
   std::vector<bool> md_guess_en_ = std::vector<bool>(N);
   std::vector<double> abs_gear_ratio_ = std::vector<double>(N);
-  std::vector<bool> cal_rq_ = std::vector<bool>(N);
   std::vector<double> load_j_ = std::vector<double>(N);
   std::vector<double> load_d_ = std::vector<double>(N);
   std::vector<double> dob_cf_ = std::vector<double>(N);

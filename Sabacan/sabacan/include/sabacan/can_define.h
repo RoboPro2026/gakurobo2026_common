@@ -110,6 +110,7 @@ constexpr uint16_t CAL_RQ = 0x06;
 constexpr uint16_t LOAD_J = 0x07;
 constexpr uint16_t LOAD_D = 0x08;
 constexpr uint16_t DOB_CF = 0x09;
+constexpr uint16_t OMEGA_N = 0x0A;
 constexpr uint16_t CAN_TIMEOUT = 0x0F;
 constexpr uint16_t TRQ = 0x10;
 constexpr uint16_t TRQ_TARGET = 0x11;
