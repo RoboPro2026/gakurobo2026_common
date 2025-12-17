@@ -112,9 +112,9 @@ private:
           // 制御方式変更前に、現在のモードに応じた安全な指令値を1周期だけ送信する
           // 多分これで、モード切り替え時に暴走する問題は解決すると思う
           float safe_ref = 0.0;
-          if (prev_control_type_ == "POSITION") { // 前の制御方式が位置制御の場合はフィードバックから得た現在の値を送信
-            safe_ref = sabacan_robomas_status_.pos;
-          } else { // 速度制御、トルク制御のときは0.0を送信する
+          if (prev_control_type_ == "POSITION") {
+            safe_ref = last_pos_ref_;  // 直前の位置指令を維持
+          } else {
             safe_ref = 0.0;  // 停止
           }
 
@@ -147,6 +147,11 @@ private:
         msg.motor_number = motor_number_;
         msg.ref = sabacan_robomas_single_ref_.ref;
         sabacan_robomas_pub_->publish(msg);
+
+        // 位置制御時の指令値を保存
+        if (control_type_ == "POSITION") {
+          last_pos_ref_ = sabacan_robomas_single_ref_.ref;
+        }
       }
     }
     RCLCPP_INFO(this->get_logger(), "control_mode: %s", control_mode_.c_str());
@@ -316,6 +321,7 @@ private:
 
   rclcpp::Time control_mode_enable_time_;
   bool is_pre_switch_safe_sent_ = false;
+  float last_pos_ref_ = 0.0;
 };
 
 int main(int argc, char * argv[])
