@@ -34,12 +34,14 @@ public:
     this->declare_parameter("control_cycle", 100.0);                 // 制御周期[Hz]
     this->declare_parameter(
       "control_type", std::string("VELOCITY"));  // 制御方式(VELOCITY, POSITION, CURRENT, TORQUE)
+    this->declare_parameter("change_mode_delay", 0.2);  // モード変更後の待機時間[s]
 
     board_id_ = this->get_parameter("board_id").as_int();
     motor_number_ = this->get_parameter("motor_number").as_int();
     control_mode_ = this->get_parameter("control_mode").as_string();
     control_type_ = this->get_parameter("control_type").as_string();
     float control_cycle_ = this->get_parameter("control_cycle").as_double();
+    change_mode_delay_ = this->get_parameter("change_mode_delay").as_double();
 
     // ROSで制御する場合のフィードバックの取得
     sabacan_robomas_sub_ = this->create_subscription<sabacan_msgs::msg::SabacanRobomasStatus>(
@@ -69,7 +71,11 @@ public:
     RCLCPP_INFO(this->get_logger(), "motor_number: %d", motor_number_);
     RCLCPP_INFO(this->get_logger(), "control_mode: %s", control_mode_.c_str());
     RCLCPP_INFO(this->get_logger(), "control_type: %s", control_type_.c_str());
+    RCLCPP_INFO(this->get_logger(), "control_type: %s", control_type_.c_str());
     RCLCPP_INFO(this->get_logger(), "control_cycle: %f", control_cycle_);
+
+    // 時刻比較での例外(Clock type mismatch)を防ぐため、ノードのクロックタイプで初期化
+    control_mode_enable_time_ = rclcpp::Time(0, 0, this->get_clock()->get_clock_type());
   }
 
 private:
@@ -102,20 +108,46 @@ private:
     } else if (control_mode_ == "SABANE") {
       // 基板側で制御
       if (sabacan_robomas_single_ref_.control_type != prev_control_type_) {
+        if (!is_pre_switch_safe_sent_) {
+          // 制御方式変更前に、現在のモードに応じた安全な指令値を1周期だけ送信する
+          // 多分これで、モード切り替え時に暴走する問題は解決すると思う
+          float safe_ref = 0.0;
+          if (prev_control_type_ == "POSITION") { // 前の制御方式が位置制御の場合はフィードバックから得た現在の値を送信
+            safe_ref = sabacan_robomas_status_.pos;
+          } else { // 速度制御、トルク制御のときは0.0を送信する
+            safe_ref = 0.0;  // 停止
+          }
+
+          auto msg = sabacan_msgs::msg::SabacanRobomasRef();
+          msg.motor_number = motor_number_;
+          msg.ref = safe_ref;
+          sabacan_robomas_pub_->publish(msg);
+
+          is_pre_switch_safe_sent_ = true;
+          RCLCPP_INFO(
+            this->get_logger(),
+            "Pre-switch safety command sent (type=%s, ref=%f). Switching next cycle.",
+            prev_control_type_.c_str(), safe_ref);
+          return;
+        }
+
         // 制御方式が変わったときのみ、パラメータを変更する
         setSingleRobomasControlType(sabacan_robomas_single_ref_.control_type);
         prev_control_type_ = sabacan_robomas_single_ref_.control_type;
         control_type_ = sabacan_robomas_single_ref_.control_type;
+        is_pre_switch_safe_sent_ = false;
       }
-      auto msg = sabacan_msgs::msg::SabacanRobomasRef();
-      msg.motor_number = motor_number_;
-      // control_type の変更が完了するまで ref を 0 にする
-      if (pending_control_type_change_) {
-        msg.ref = 0.0;
+      // control_type の変更中、または変更後の待機時間中はpublishしない
+      if (pending_control_type_change_ || this->now() < control_mode_enable_time_) {
+        // 何もしない (ref=0.0 も送らない)
+        // pending_control_type_change_ : パラメータ変更の応答待ち
+        // control_mode_enable_time_    : 変更後の安定化待機時間
       } else {
+        auto msg = sabacan_msgs::msg::SabacanRobomasRef();
+        msg.motor_number = motor_number_;
         msg.ref = sabacan_robomas_single_ref_.ref;
+        sabacan_robomas_pub_->publish(msg);
       }
-      sabacan_robomas_pub_->publish(msg);
     }
     RCLCPP_INFO(this->get_logger(), "control_mode: %s", control_mode_.c_str());
     RCLCPP_INFO(this->get_logger(), "control_type: %s", control_type_.c_str());
@@ -169,11 +201,13 @@ private:
           }
         }
         if (all_success) {
-          // control_type 変更完了。ref のゼロ固定を解除
+          // control_type 変更完了。Delayを設定してフラグ解除
+          // ※ ここでフラグをfalseにするが、timerCallback側で時刻チェックも行っているため安全
+          control_mode_enable_time_ = this->now() + rclcpp::Duration::from_seconds(change_mode_delay_);
           pending_control_type_change_ = false;
           RCLCPP_INFO(
-            this->get_logger(), "Set control_type on /sabacan_robomasv2_node_id%d successfully",
-            board_id_);
+            this->get_logger(), "Set control_type on /sabacan_robomasv2_node_id%d successfully. Wait %.2fs",
+            board_id_, change_mode_delay_);
         }
       });
     (void)future;  // 使わないが、ここで破棄しない
@@ -243,6 +277,16 @@ private:
         RCLCPP_INFO(
           this->get_logger(), "Set control_type[%u]=%s requested on /sabacan_robomasv2_node_id%d",
           motor_number_, control_type.c_str(), board_id_);
+
+        // パラメータ設定リクエストを投げたので、完了応答待ちを解除するが、
+        // 実際にはsetRobomasControlTypeの非同期応答(set_param_client_)でpending解除すべき。
+        // しかし現在の構造ではsetRobomasControlType内ですぐにpending解除しているため、
+        // ここでは追加のDelayを設定する。
+        // ※ 本来は setRobomasControlType のコールバックチェーンでフラグ操作すべきだが、
+        //    既存コード(setRobomasControlType)がpending_control_type_change_を操作しているのでそれに従う。
+        //    ただし、setRobomasControlTypeの実装を見ると、全てのresultがsuccessのときのみフラグを下ろしている。
+        //    ここ(get_param callback)はリクエストを投げただけなので、まだフラグを下ろしてはいけない。
+        //    setRobomasControlType側のcallbackでフラグが落ち、そのタイミングでDelayをセットする必要がある。
       });
     (void)future_get;
     return true;
@@ -268,6 +312,10 @@ private:
 
   // control_type 変更完了まで ref を 0 に固定するためのフラグ
   bool pending_control_type_change_ = false;
+  double change_mode_delay_;
+
+  rclcpp::Time control_mode_enable_time_;
+  bool is_pre_switch_safe_sent_ = false;
 };
 
 int main(int argc, char * argv[])

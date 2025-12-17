@@ -19,6 +19,7 @@
   - `control_mode`: 制御モード。`"ROS"`または`"SABANE"`。デフォルトは`"SABANE"`
   - `control_cycle`: 制御周期[Hz]。デフォルトは`100.0`
   - `control_type`: 制御方式。`"VELOCITY"`, `"POSITION"`, `"CURRENT"`, `"TORQUE"`。デフォルトは`"VELOCITY"`
+  - `change_mode_delay`: モード変更後の待機時間[s]。デフォルトは`0.2`。この期間中は指令値の送信を停止する。
 
 - メッセージ型
   - `/sabacan_robomas_ref<board_id>`: `sabacan_msgs::msg::SabacanRobomasRef`
@@ -52,3 +53,25 @@
 
 - `SABANE`: 基板側で制御。さばね謹製 PID & DOB
 - `ROS`: ROS2 側で制御。全部１から制御したい人向け。まだ実装してない。
+
+# 動作テスト
+
+## モード切替時の安全機能テスト
+
+モーターが暴走しないか、以下の手順で確認できます。
+
+1. ノードを起動（例: board_id=0, motor_number=0）
+   ```bash
+   ros2 run sabacan_single_control sabacan_single_control_node --ros-args -p board_id:=0 -p motor_number:=0
+   ```
+
+2. 速度制御で回転させる
+   ```bash
+   ros2 topic pub /sabacan_robomas_ref0/motor0 sabacan_single_control_msgs/msg/SabacanRobomasSingleRef "{control_type: 'VELOCITY', ref: 10.0}" -1
+   ```
+
+3. 位置制御に切り替える（暴走リスクが高い操作）
+   - 変更直後に安全な待機時間(`change_mode_delay`)が挿入され、その間指令値が送信されないため、急激な動き（位置0への収束）が発生しないことを確認します。
+   ```bash
+   ros2 topic pub /sabacan_robomas_ref0/motor0 sabacan_single_control_msgs/msg/SabacanRobomasSingleRef "{control_type: 'POSITION', ref: 0.0}" -1
+   ```
