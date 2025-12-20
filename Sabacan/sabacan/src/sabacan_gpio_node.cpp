@@ -42,6 +42,11 @@ public:
     // pwm_freqのデフォルト値はすべて0Hz（無効）
     this->declare_parameter("pwm_freq", std::vector<int64_t>{0, 0, 0, 0, 0, 0, 0, 0, 0});
 
+    this->declare_parameter<int64_t>("servo_min_angle", 0);
+    this->declare_parameter<int64_t>("servo_max_angle", 180);
+    this->declare_parameter<int64_t>("servo_min_pulse_width", 500);
+    this->declare_parameter<int64_t>("servo_max_pulse_width", 2500);
+
     // デフォルトでは20Hz(50ms)でPORT_READを送信
     this->declare_parameter("monitor_period", 50);
     this->declare_parameter("enable_monitor_period", true);
@@ -223,9 +228,7 @@ public:
       return;
     }
     // 指定されたピンがfloat型のrefに対応しているか確認
-    if (
-      pin_type_[msg->pin_number] != PIN_TYPE_OUTPUT_PWM &&
-      pin_type_[msg->pin_number] != PIN_TYPE_OUTPUT_SERVO) {
+    if (pin_type_[msg->pin_number] != PIN_TYPE_OUTPUT_PWM) {
       RCLCPP_ERROR(
         this->get_logger(),
         "Pin number %d is not configured for float reference output. Ignoring SabacanGPIORefFloat "
@@ -265,9 +268,6 @@ public:
       RCLCPP_INFO(
         this->get_logger(), "Set PWM duty for pin %d: ref_float=%f, pwm_period=%d, pwm_duty=%d",
         pin_num, msg->ref_float, pwm_period, pwm_duty);
-    } else if (pin_type_[pin_num] == PIN_TYPE_OUTPUT_SERVO) {
-      // サーボ出力の場合
-      // TODO: サーボの出力処理を書く
     }
   }
 
@@ -280,7 +280,9 @@ public:
       return;
     }
     // 指定されたピンがint型のrefに対応しているか確認
-    if (pin_type_[msg->pin_number] != PIN_TYPE_OUTPUT_ESC) {
+    bool is_esc = (pin_type_[msg->pin_number] == PIN_TYPE_OUTPUT_ESC);
+    bool is_servo = (pin_type_[msg->pin_number] == PIN_TYPE_OUTPUT_SERVO);
+    if (is_esc == false && is_servo == false) {
       RCLCPP_ERROR(
         this->get_logger(),
         "Pin number %d is not configured for int reference output. Ignoring SabacanGPIORefInt "
@@ -289,7 +291,30 @@ public:
       return;
     }
     int pin_num = msg->pin_number;
-    if (pin_type_[pin_num] == PIN_TYPE_OUTPUT_ESC) {
+    if (pin_type_[pin_num] == PIN_TYPE_OUTPUT_SERVO) {
+      // サーボ出力の場合
+      int32_t angle = msg->ref_int;
+      // サーボは範囲外の角度を入力して微調整したくなるときがあるかもなので、範囲のチェックは行わない
+      double pulse_width_us =
+        (double)servo_min_pulse_width_ + (double)(servo_max_pulse_width_ - servo_min_pulse_width_) *
+                                           (double)(angle - servo_min_angle_) /
+                                           (double)(servo_max_angle_ - servo_min_angle_);
+
+      double pulse_width_s = pulse_width_us * 1e-6;
+      double duty = pulse_width_s / (1 / (double)pwm_freq_[pin_num]);
+      RCLCPP_INFO(
+        this->get_logger(), "Calculated duty: %.6f, pulse_width_s = %f, pwm_freq = %f", duty,
+        pulse_width_s, (double)pwm_freq_[pin_num]);
+      uint16_t pwm_period = GPIODriver::PWM_COUNTER_FREQ / pwm_freq_[pin_num];
+      pwm_duty_[pin_num] = duty * (double)pwm_period;
+      gpio_driver_->setPwmDuty(pin_num, pwm_duty_[pin_num]);
+      RCLCPP_INFO(
+        this->get_logger(),
+        "Set servo angle for pin %d: ref_int=%d, pulse_width=%.2f us, pwm_period=%d, pwm_duty=%d",
+        pin_num, msg->ref_int, pulse_width_us, pwm_period, pwm_duty_[pin_num]);
+      delay();
+
+    } else if (pin_type_[pin_num] == PIN_TYPE_OUTPUT_ESC) {
       // ESC出力の場合
       uint16_t esc_value = static_cast<uint16_t>(msg->ref_int);
       // ESCの指令値が50~100の範囲であるかを確認
@@ -358,8 +383,19 @@ public:
 
   void gpio_init()
   {
+    // clang-format off
     std::vector<std::string> param_name{
-      "pin_type", "pwm_freq", "monitor_period", "enable_monitor_period", "monitor_reg"};
+      "pin_type",
+      "pwm_freq",
+      "servo_min_angle",
+      "servo_max_angle",
+      "servo_min_pulse_width",
+      "servo_max_pulse_width",
+      "monitor_period",
+      "enable_monitor_period",
+      "monitor_reg"
+    };
+    // clang-format on
 
     rclcpp::Time start_time = this->get_clock()->now();
 
@@ -438,6 +474,16 @@ public:
         gpio_driver_->setPwmDuty(i, pwm_duty_[i]);
         delay();
       }
+      // OUTPUT_SERVOに設定したときは、デフォルトで50Hzに設定する
+      for (int i = 0; i < N; i++) {
+        if (pin_type_[i] == PIN_TYPE_OUTPUT_SERVO) {
+          pwm_freq_[i] = 50;
+          uint16_t pwm_period = GPIODriver::PWM_COUNTER_FREQ / pwm_freq_[i];
+          RCLCPP_INFO(this->get_logger(), "pwm_period = %d", pwm_period);
+          gpio_driver_->setPwmPeriod(i, pwm_period);
+          delay();
+        }
+      }
       // 設定が完了したから、出力を有効にする
       gpio_driver_->setPortWrite(port_write);
       delay();
@@ -448,7 +494,7 @@ public:
       std::vector<uint16_t> pwm_period(N);
       for (size_t i = 0; i < N; i++) {
         pwm_freq_[i] = tmp_param[i];
-        if (pin_type_[i] == PIN_TYPE_OUTPUT_PWM || pin_type_[i] == PIN_TYPE_OUTPUT_SERVO) {
+        if (pin_type_[i] == PIN_TYPE_OUTPUT_PWM) {
           // pwm_freqが0以下でないかを確認
           if (pwm_freq_[i] <= 0) {
             RCLCPP_ERROR(
@@ -459,6 +505,13 @@ public:
           }
           // (1 / pwm_freq_[i]) / (1 / GPIODriver::PWM_COUNTER_FREQ);
           pwm_period[i] = GPIODriver::PWM_COUNTER_FREQ / pwm_freq_[i];
+        } else if (pin_type_[i] == PIN_TYPE_OUTPUT_SERVO) {
+          // サーボの場合、デフォルトで50Hzに設定
+          pwm_freq_[i] = 50;
+          pwm_period[i] = GPIODriver::PWM_COUNTER_FREQ / pwm_freq_[i];
+        } else {
+          // それ以外のときは、念の為明示的に0に設定
+          pwm_period[i] = 0;
         }
       }
       // pwm_periodをCANデバイスに送信
@@ -466,11 +519,32 @@ public:
         gpio_driver_->setPwmPeriod(i, pwm_period[i]);
         delay();
       }
+    } else if (name == "servo_min_angle") {
+      int64_t tmp_param = parameter.as_int();
+      if (check_data_range<int64_t>(tmp_param, 0, 360, name) == false) return false;
+      servo_min_angle_ = tmp_param;
+    } else if (name == "servo_max_angle") {
+      int64_t tmp_param = parameter.as_int();
+      if (check_data_range<int64_t>(tmp_param, 0, 360, name) == false) return false;
+      servo_max_angle_ = tmp_param;
+    } else if (name == "servo_min_pulse_width") {
+      int64_t tmp_param = parameter.as_int();
+      if (check_data_range<int64_t>(tmp_param, 0, inf, name) == false) return false;
+      servo_min_pulse_width_ = tmp_param;
+    } else if (name == "servo_max_pulse_width") {
+      int64_t tmp_param = parameter.as_int();
+      if (check_data_range<int64_t>(tmp_param, 0, inf, name) == false) return false;
+      servo_max_pulse_width_ = tmp_param;
     } else if (name == "monitor_period") {
       int64_t tmp_param = parameter.as_int();
       if (check_data_range<int64_t>(tmp_param, 0, inf, name) == false) return false;
       monitor_period_ = tmp_param;
       gpio_driver_->setMonitorPeriod(static_cast<uint16_t>(monitor_period_));
+      delay();
+    } else if (name == "monitor_reg") {
+      int64_t tmp_param = parameter.as_int();
+      monitor_reg_ = tmp_param;
+      gpio_driver_->setMonitorReg(static_cast<uint64_t>(monitor_reg_));
       delay();
     } else if (name == "enable_monitor_period") {
       enable_monitor_period_ = parameter.as_bool();
@@ -483,11 +557,6 @@ public:
         gpio_driver_->setMonitorReg(static_cast<uint64_t>(monitor_reg_));
         delay();
       }
-    } else if (name == "monitor_reg") {
-      int64_t tmp_param = parameter.as_int();
-      monitor_reg_ = tmp_param;
-      gpio_driver_->setMonitorReg(static_cast<uint64_t>(monitor_reg_));
-      delay();
     }
     return ret;
   }
@@ -518,6 +587,10 @@ private:
   // パラメータ、サービスで使用する変数
   std::vector<int64_t> pin_type_ = std::vector<int64_t>(N);
   std::vector<int64_t> pwm_freq_ = std::vector<int64_t>(N);
+  int64_t servo_min_angle_;
+  int64_t servo_max_angle_;
+  int64_t servo_min_pulse_width_;
+  int64_t servo_max_pulse_width_;
   bool enable_monitor_period_;
   int64_t monitor_period_;
   int64_t monitor_reg_;

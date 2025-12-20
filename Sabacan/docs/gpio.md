@@ -40,8 +40,12 @@ ros2 run sabacan sabacan_gpio_node --ros-args \
       * `"INPUT"`: デジタル入力。
       * `"OUTPUT_PWM"`: PWM出力。
       * `"OUTPUT_ESC"`: ESC制御。
-      * `"OUTPUT_SERVO"`: サーボモーター制御。
-  * `pwm_freq` (int64配列, デフォルト: 全て `0`): PWM周波数 (Hz)。`OUTPUT_PWM`/`OUTPUT_SERVO` では **0より大きい値** が必要。
+      * `"OUTPUT_SERVO_SG90"`: サーボモーター制御。
+  * `pwm_freq` (int64配列, デフォルト: 全て `0`): PWM周波数 (Hz)。`OUTPUT_PWM`で使用する。`OUTPUT_SERVO_SG90`のときは、sabacan_gpio_node内で、自動で50Hzに設定される。  
+  * `servo_min_angle`[deg]: サーボの最小角度（0以上の整数値）。初期値0。
+  * `servo_max_angle`[deg]: サーボの最大角度（0以上の整数値）。初期値180。
+  * `servo_min_pulse_width`[us]: サーボの最小角度のときのパルス幅。初期値500us。使うサーボによって微妙に異なるので、事前に確認すること。
+  * `servo_max_pulse_width`[us]: サーボの最大角度のときのパルス幅。初期値2500us。使うサーボによって微妙に異なるので、事前に確認すること。
   * `monitor_period` (int, デフォルト: 50): 入力状態のパブリッシュ周期 (ms)。
   * `enable_monitor_period` (bool, デフォルト: true): 周期パブリッシュの有効/無効。
   * `monitor_reg` (int64): 基板に周期送信を要求するレジスタのビットマスク。
@@ -50,7 +54,7 @@ ros2 run sabacan sabacan_gpio_node --ros-args \
 
 ピンのモード (`pin_type`) に応じて、適切なトピックにメッセージを送信します。
 
-  * **PWM出力 (`OUTPUT_PWM`) / サーボ (`OUTPUT_SERVO`)**
+  * **PWM出力 (`OUTPUT_PWM`)**
 
       * トピック: `/sabacan_gpio_ref_float<board_id>`
       * メッセージ: `sabacan_msgs/msg/SabacanGPIORefFloat`
@@ -59,6 +63,20 @@ ros2 run sabacan sabacan_gpio_node --ros-args \
       * **例 (board\_id=2, ピン0, デューティ比 0.5):**
         ```bash
         ros2 topic pub /sabacan_gpio_ref_float2 sabacan_msgs/msg/SabacanGPIORefFloat '{pin_number: 0, ref_float: 0.5}'
+        ```
+
+
+  * **サーボ出力 (`OUTPUT_SERVO`)**
+
+      * トピック: `/sabacan_gpio_ref_int<board_id>`
+      * メッセージ: `sabacan_msgs/msg/SabacanGPIORefInt`
+          * `pin_number` (uint8): ピン番号 (0-8)
+          * `ref_int` (int32): 指令値 (角度の整数値)
+            * ただし、使うESCによっては値の範囲が変わることがあるので注意。
+            * サーボは謎の微調整をすることを考慮し、範囲外の値も入力できるようにしてある。
+      * **例 (board\_id=2, ピン8, 角度 90[deg]):**
+        ```bash
+        ros2 topic pub /sabacan_gpio_ref_int2 sabacan_msgs/msg/SabacanGPIORefInt '{pin_number: 8, ref_int: 90}'
         ```
 
   * **ESC出力 (`OUTPUT_ESC`)**
