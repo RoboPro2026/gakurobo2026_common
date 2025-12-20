@@ -42,10 +42,14 @@ public:
     // pwm_freqのデフォルト値はすべて0Hz（無効）
     this->declare_parameter("pwm_freq", std::vector<int64_t>{0, 0, 0, 0, 0, 0, 0, 0, 0});
 
-    this->declare_parameter<int64_t>("servo_min_angle", 0);
-    this->declare_parameter<int64_t>("servo_max_angle", 180);
-    this->declare_parameter<int64_t>("servo_min_pulse_width", 500);
-    this->declare_parameter<int64_t>("servo_max_pulse_width", 2500);
+    this->declare_parameter("servo_min_angle", std::vector<int64_t>{0, 0, 0, 0, 0, 0, 0, 0, 0});
+    this->declare_parameter(
+      "servo_max_angle", std::vector<int64_t>{180, 180, 180, 180, 180, 180, 180, 180, 180});
+    this->declare_parameter(
+      "servo_min_pulse_width", std::vector<int64_t>{500, 500, 500, 500, 500, 500, 500, 500, 500});
+    this->declare_parameter(
+      "servo_max_pulse_width",
+      std::vector<int64_t>{2500, 2500, 2500, 2500, 2500, 2500, 2500, 2500, 2500});
 
     // デフォルトでは20Hz(50ms)でPORT_READを送信
     this->declare_parameter("monitor_period", 50);
@@ -295,16 +299,15 @@ public:
       // サーボ出力の場合
       int32_t angle = msg->ref_int;
       // サーボは範囲外の角度を入力して微調整したくなるときがあるかもなので、範囲のチェックは行わない
+      double min_width = (double)servo_min_pulse_width_[pin_num];
+      double max_width = (double)servo_max_pulse_width_[pin_num];
+      double min_angle = (double)servo_min_angle_[pin_num];
+      double max_angle = (double)servo_max_angle_[pin_num];
       double pulse_width_us =
-        (double)servo_min_pulse_width_ + (double)(servo_max_pulse_width_ - servo_min_pulse_width_) *
-                                           (double)(angle - servo_min_angle_) /
-                                           (double)(servo_max_angle_ - servo_min_angle_);
+        min_width + (max_width - min_width) * ((double)angle - min_angle) / (max_angle - min_angle);
 
       double pulse_width_s = pulse_width_us * 1e-6;
       double duty = pulse_width_s / (1 / (double)pwm_freq_[pin_num]);
-      RCLCPP_INFO(
-        this->get_logger(), "Calculated duty: %.6f, pulse_width_s = %f, pwm_freq = %f", duty,
-        pulse_width_s, (double)pwm_freq_[pin_num]);
       uint16_t pwm_period = GPIODriver::PWM_COUNTER_FREQ / pwm_freq_[pin_num];
       pwm_duty_[pin_num] = duty * (double)pwm_period;
       gpio_driver_->setPwmDuty(pin_num, pwm_duty_[pin_num]);
@@ -520,20 +523,20 @@ public:
         delay();
       }
     } else if (name == "servo_min_angle") {
-      int64_t tmp_param = parameter.as_int();
-      if (check_data_range<int64_t>(tmp_param, 0, 360, name) == false) return false;
+      auto tmp_param = parameter.as_integer_array();
+      if (check_data_range_and_size<int64_t>(tmp_param, 0, 360, N, name) == false) return false;
       servo_min_angle_ = tmp_param;
     } else if (name == "servo_max_angle") {
-      int64_t tmp_param = parameter.as_int();
-      if (check_data_range<int64_t>(tmp_param, 0, 360, name) == false) return false;
+      auto tmp_param = parameter.as_integer_array();
+      if (check_data_range_and_size<int64_t>(tmp_param, 0, 360, N, name) == false) return false;
       servo_max_angle_ = tmp_param;
     } else if (name == "servo_min_pulse_width") {
-      int64_t tmp_param = parameter.as_int();
-      if (check_data_range<int64_t>(tmp_param, 0, inf, name) == false) return false;
+      auto tmp_param = parameter.as_integer_array();
+      if (check_data_range_and_size<int64_t>(tmp_param, 0, inf, N, name) == false) return false;
       servo_min_pulse_width_ = tmp_param;
     } else if (name == "servo_max_pulse_width") {
-      int64_t tmp_param = parameter.as_int();
-      if (check_data_range<int64_t>(tmp_param, 0, inf, name) == false) return false;
+      auto tmp_param = parameter.as_integer_array();
+      if (check_data_range_and_size<int64_t>(tmp_param, 0, inf, N, name) == false) return false;
       servo_max_pulse_width_ = tmp_param;
     } else if (name == "monitor_period") {
       int64_t tmp_param = parameter.as_int();
@@ -587,10 +590,10 @@ private:
   // パラメータ、サービスで使用する変数
   std::vector<int64_t> pin_type_ = std::vector<int64_t>(N);
   std::vector<int64_t> pwm_freq_ = std::vector<int64_t>(N);
-  int64_t servo_min_angle_;
-  int64_t servo_max_angle_;
-  int64_t servo_min_pulse_width_;
-  int64_t servo_max_pulse_width_;
+  std::vector<int64_t> servo_min_angle_ = std::vector<int64_t>(N);
+  std::vector<int64_t> servo_max_angle_ = std::vector<int64_t>(N);
+  std::vector<int64_t> servo_min_pulse_width_ = std::vector<int64_t>(N);
+  std::vector<int64_t> servo_max_pulse_width_ = std::vector<int64_t>(N);
   bool enable_monitor_period_;
   int64_t monitor_period_;
   int64_t monitor_reg_;

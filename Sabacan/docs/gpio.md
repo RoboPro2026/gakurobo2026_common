@@ -23,13 +23,14 @@ ros2 run sabacan sabacan_gpio_node --ros-args -p board_id:=2
 
 ノード起動時、または `ros2 param set` コマンドでパラメータを設定できます。
 
-**例: ピン0をPWM出力 (1kHz)、ピン8をESC出力、その他を入力に設定**
+**例: ピン0をPWM出力 (1kHz)、ピン1を180度サーボ、ピン2を270度サーボ、ピン8をESC出力、その他を入力に設定**
 
 ```bash
 ros2 run sabacan sabacan_gpio_node --ros-args \
   -p board_id:=2 \
-  -p pin_type:="['OUTPUT_PWM','INPUT','INPUT','INPUT','INPUT','INPUT','INPUT','INPUT','OUTPUT_ESC']" \
-  -p pwm_freq:="[1000, 0, 0, 0, 0, 0, 0, 0, 0]"
+  -p pin_type:="['OUTPUT_PWM','OUTPUT_SERVO','OUTPUT_SERVO','INPUT','INPUT','INPUT','INPUT','INPUT','OUTPUT_ESC']" \
+  -p pwm_freq:="[1000, 0, 0, 0, 0, 0, 0, 0, 0]" \
+  -p servo_max_angle:="[180, 280, 180, 180, 180, 180, 180, 180, 180]"
 ```
 
 **主要なパラメータ:**
@@ -42,10 +43,10 @@ ros2 run sabacan sabacan_gpio_node --ros-args \
       * `"OUTPUT_ESC"`: ESC制御。
       * `"OUTPUT_SERVO_SG90"`: サーボモーター制御。
   * `pwm_freq` (int64配列, デフォルト: 全て `0`): PWM周波数 (Hz)。`OUTPUT_PWM`で使用する。`OUTPUT_SERVO_SG90`のときは、sabacan_gpio_node内で、自動で50Hzに設定される。  
-  * `servo_min_angle`[deg]: サーボの最小角度（0以上の整数値）。初期値0。
-  * `servo_max_angle`[deg]: サーボの最大角度（0以上の整数値）。初期値180。
-  * `servo_min_pulse_width`[us]: サーボの最小角度のときのパルス幅。初期値500us。使うサーボによって微妙に異なるので、事前に確認すること。
-  * `servo_max_pulse_width`[us]: サーボの最大角度のときのパルス幅。初期値2500us。使うサーボによって微妙に異なるので、事前に確認すること。
+  * `servo_min_angle`[deg]: サーボの最小角度（0以上の整数値）。int64配列で初期値0。
+  * `servo_max_angle`[deg]: サーボの最大角度（0以上の整数値）。int64配列で初期値180。270度サーボの場合は270にする。
+  * `servo_min_pulse_width`[us]: サーボの最小角度のときのパルス幅。int64配列で初期値500us。使うサーボによって微妙に異なるので、事前に確認すること。
+  * `servo_max_pulse_width`[us]: サーボの最大角度のときのパルス幅。int64配列で初期値2500us。使うサーボによって微妙に異なるので、事前に確認すること。
   * `monitor_period` (int, デフォルト: 50): 入力状態のパブリッシュ周期 (ms)。
   * `enable_monitor_period` (bool, デフォルト: true): 周期パブリッシュの有効/無効。
   * `monitor_reg` (int64): 基板に周期送信を要求するレジスタのビットマスク。
