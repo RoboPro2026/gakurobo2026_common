@@ -23,10 +23,11 @@ public:
   bool abs_enc_en[N] = {0};
   bool md_guess_en[N] = {0};
   float abs_gear_ratio[N] = {0};
-  bool cal_rq[N] = {0};
+  int8_t cal_rq[N] = {0};
   float load_j[N] = {0};
   float load_d[N] = {0};
-  float dob_cutoff_freq[N] = {0};
+  float dob_cf[N] = {0};
+  float omega_n[N] = {0};
   uint16_t can_timeout = {0};
   float current_torque[N] = {0};
   float trq_target[N] = {0};
@@ -78,7 +79,7 @@ public:
    * @brief キャリブレーションのリクエスト
    *
    */
-  void setCalRq(int n, bool val) { tx((n & 0xF) << 8 | RobomasV2::CAL_RQ, val); }
+  void setCalRq(int n, int8_t val) { tx((n & 0xF) << 8 | RobomasV2::CAL_RQ, val); }
 
   void setLoad_J(int n, float val) { tx((n & 0xF) << 8 | RobomasV2::LOAD_J, val); }
 
@@ -89,6 +90,8 @@ public:
    *
    */
   void setDob_CF(int n, float val) { tx((n & 0xF) << 8 | RobomasV2::DOB_CF, val); }
+
+  void setOmega_N(int n, float val) { tx((n & 0xF) << 8 | RobomasV2::OMEGA_N, val); }
 
   void setCanTimeout(uint16_t val) { tx(RobomasV2::CAN_TIMEOUT, val); }
 
@@ -162,7 +165,10 @@ public:
         assign(&load_d[n], frame.data);
         break;
       case RobomasV2::DOB_CF:
-        assign(&dob_cutoff_freq[n], frame.data);
+        assign(&dob_cf[n], frame.data);
+        break;
+      case RobomasV2::OMEGA_N:
+        assign(&omega_n[n], frame.data);
         break;
       case RobomasV2::CAN_TIMEOUT:
         assign(&can_timeout, frame.data);
