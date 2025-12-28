@@ -9,17 +9,17 @@
 #include "can_msgs/msg/frame.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sabacan/sabacan.h"
-#include "sabacan_msgs/msg/sabacan_power_ref.hpp"
-#include "sabacan_msgs/msg/sabacan_power_status.hpp"
+#include "sabacan_msgs/msg/sabacan_led_mode.hpp"
+#include "sabacan_msgs/msg/sabacan_led_ref.hpp"
 #include "sabacan_msgs/srv/sabacan_reset.hpp"
 
 using namespace std::chrono_literals;
 
-class SabacanPowerNode : public rclcpp::Node
+class SabacanLEDNode : public rclcpp::Node
 {
 public:
-  SabacanPowerNode(const rclcpp::NodeOptions & options = rclcpp::NodeOptions())
-  : Node("sabacan_power_node")
+  SabacanLEDNode(const rclcpp::NodeOptions & options = rclcpp::NodeOptions())
+  : Node("sabacan_led_node")
   {
     // board_idを必須パラメータとして宣言（デフォルト値なし）
     // パラメータの制約や説明を記述子で定義
@@ -31,6 +31,20 @@ public:
     board_id_descriptor.integer_range[0].to_value = 9;
     board_id_descriptor.integer_range[0].step = 1;
     this->declare_parameter<int64_t>("board_id", board_id_descriptor);
+
+    this->declare_parameter<bool>("enable_auto_transition", true);
+    this->declare_parameter<int64_t>("emg_blink_period", 0);
+    // emg_color
+    // 面倒なので、emg_colorはすべてのLEDで統一する
+    this->declare_parameter("emg_color", std::vector<int64_t>{0x40, 0x00, 0x00});
+
+    // デフォルトでは何もmonitor_regは設定しない
+    this->declare_parameter("monitor_period", 50);
+    this->declare_parameter("enable_monitor_period", true);
+    int64_t reg1 = 0LL;
+    this->declare_parameter("monitor_reg1", reg1);
+    int64_t reg2 = 0LL;
+    this->declare_parameter("monitor_reg2", reg2);
 
     // 必須パラメータ'board_id'が設定されているかチェック
     try {
@@ -46,52 +60,43 @@ public:
       throw;
     }
 
-    this->declare_parameter<int64_t>("cell_n", 6);
-    this->declare_parameter<int64_t>("ex_ems_trg", 0);
-    this->declare_parameter<bool>("common_ems_en", true);
-    this->declare_parameter<double>("v_limit_high", 4.3);
-    this->declare_parameter<double>("v_limit_low", 3.7);
-    this->declare_parameter<double>("i_limit", 100.0);
-    // デフォルトでは、PCU_STATE、OUT_V、OUT_Iを20Hzでモニタリング
-    this->declare_parameter("enable_monitor_period", true);
-    this->declare_parameter("monitor_period", 50);
-    int64_t reg = 0LL;
-    reg |= 1LL << Power::PCU_STATE;
-    reg |= 1LL << Power::OUT_V;
-    reg |= 1LL << Power::OUT_I;
-    this->declare_parameter("monitor_reg", reg);
-
-    // CANデータ送信用のPublisher
-    can_publisher_ = this->create_publisher<can_msgs::msg::Frame>("/to_can_bus", 100);
-
-    // CANデータ受信用のSubscriber
-    can_subscription_ = this->create_subscription<can_msgs::msg::Frame>(
-      "/from_can_bus", 100,
-      std::bind(&SabacanPowerNode::can_callback, this, std::placeholders::_1));
-
-    sabacan_power_ref_subscription_ = this->create_subscription<sabacan_msgs::msg::SabacanPowerRef>(
-      "/sabacan_power_ref" + std::to_string(board_id_), 10,
-      std::bind(&SabacanPowerNode::sabacan_power_ref_callback, this, std::placeholders::_1));
-
-    sabacan_power_status_publisher_ = this->create_publisher<sabacan_msgs::msg::SabacanPowerStatus>(
-      "/sabacan_power_status" + std::to_string(board_id_), 10);
-
-    parameter_callback_handle_ = this->add_on_set_parameters_callback(
-      std::bind(&SabacanPowerNode::parameter_callback, this, std::placeholders::_1));
-
     can_driver_ = std::make_shared<CanDriver>();
-    common_data_driver_ = std::make_shared<CommonDataDriver>(can_driver_);
-    power_driver_ = std::make_shared<PowerDriver>(can_driver_, board_id_);
+    led_driver_ = std::make_shared<LEDDriver>(can_driver_, board_id_);
 
     can_driver_->register_tx_callback(
       [this](uint32_t id, uint8_t * data, uint8_t dlc, bool is_remote, bool is_ext) {
         this->tx(id, data, dlc, is_remote, is_ext);
       });
 
-    // 100Hzのタイマーを設定
-    timer_ = this->create_wall_timer(10ms, std::bind(&SabacanPowerNode::timer_callback, this));
+    // CANデータ送信用のPublisher
+    can_publisher_ = this->create_publisher<can_msgs::msg::Frame>("/to_can_bus", 100);
 
-    power_init();
+    // CANデータ受信用のSubscriber
+    can_subscription_ = this->create_subscription<can_msgs::msg::Frame>(
+      "/from_can_bus", 100, std::bind(&SabacanLEDNode::can_callback, this, std::placeholders::_1));
+
+    // LED modeのSubscriber
+    sabacan_led_mode_subscription_ = this->create_subscription<sabacan_msgs::msg::SabacanLEDMode>(
+      "/sabacan_led_mode" + std::to_string(board_id_), 10,
+      std::bind(&SabacanLEDNode::sabacan_led_mode_callback, this, std::placeholders::_1));
+
+    // LEDの指令値のSubscriber
+    sabacan_led_ref_subscription_ = this->create_subscription<sabacan_msgs::msg::SabacanLEDRef>(
+      "/sabacan_led_ref" + std::to_string(board_id_), 10,
+      std::bind(&SabacanLEDNode::sabacan_led_ref_callback, this, std::placeholders::_1));
+
+    // リセットサービスサーバーの作成
+    reset_service_ = this->create_service<sabacan_msgs::srv::SabacanReset>(
+      "sabacan_led_reset" + std::to_string(board_id_),
+      std::bind(
+        &SabacanLEDNode::reset_callback, this, std::placeholders::_1, std::placeholders::_2));
+
+    // パラメータ変更コールバックの設定
+    parameter_callback_handle_ = this->add_on_set_parameters_callback(
+      std::bind(&SabacanLEDNode::parameter_callback, this, std::placeholders::_1));
+
+    // 初期化命令を送信
+    led_init();
   }
 
   template <typename T>
@@ -178,34 +183,35 @@ public:
     }
 
     frame = can_driver_->rx_frame(msg->id, data, msg->dlc, msg->is_rtr, msg->is_extended);
-    power_driver_->receive(frame);
+    led_driver_->receive(frame);
   }
 
-  /**
-   * @brief トピックで目標値が更新されたときのcallback
-   *
-   * @param msg
-   */
-  void sabacan_power_ref_callback(const sabacan_msgs::msg::SabacanPowerRef::SharedPtr msg)
+  void sabacan_led_mode_callback(const sabacan_msgs::msg::SabacanLEDMode::SharedPtr msg)
   {
-    bool is_ems = msg->is_ems;
-    if (is_ems)
-      common_data_driver_->ems();
-    else
-      common_data_driver_->reset_ems();
+    led_driver_->setLedMode(msg->led_mode);
+    RCLCPP_INFO(this->get_logger(), "Set LED Mode: led_mode=%d", msg->led_mode);
+  }
+
+  void sabacan_led_ref_callback(const sabacan_msgs::msg::SabacanLEDRef::SharedPtr msg)
+  {
+    if (msg->pin_number >= M) {
+      RCLCPP_ERROR(this->get_logger(), "pin_number is out of range. value = %d", msg->pin_number);
+      return;
+    }
+    led_driver_->setLedRef(msg->pin_number, msg->start, msg->length, msg->r, msg->g, msg->b);
     RCLCPP_INFO(
-      this->get_logger(), "Received Emergency signal: is_ems = %s",
-      is_ems == true ? "true" : "false");
+      this->get_logger(), "Set LED Ref: pin_number=%d, start=%d, length=%d, r=%d, g=%d, b=%d",
+      msg->pin_number, msg->start, msg->length, msg->r, msg->g, msg->b);
   }
 
-  void timer_callback()
+  void reset_callback(
+    const std::shared_ptr<sabacan_msgs::srv::SabacanReset::Request> request,
+    std::shared_ptr<sabacan_msgs::srv::SabacanReset::Response> response)
   {
-    // 定期的にSabacanPowerStatusを送信
-    sabacan_msgs::msg::SabacanPowerStatus msg;
-    msg.pcu_state = power_driver_->pcu_state;
-    msg.out_v = power_driver_->out_v;
-    msg.out_i = power_driver_->out_i;
-    sabacan_power_status_publisher_->publish(msg);
+    (void)request;
+    led_init();
+    response->success = true;
+    RCLCPP_INFO(this->get_logger(), "LED driver has been reset.");
   }
 
   // パラメータ変更コールバック
@@ -227,11 +233,12 @@ public:
     return result;
   }
 
-  void power_init()
+  void led_init()
   {
-    std::vector<std::string> param_name{"cell_n",         "ex_ems_trg",  "common_ems_en",
-                                        "v_limit_high",   "v_limit_low", "i_limit",
-                                        "monitor_period", "monitor_reg", "enable_monitor_period"};
+    std::vector<std::string> param_name{
+      "enable_auto_transition", "emg_blink_period", "emg_color",
+      "monitor_period",         "monitor_reg1",     "monitor_reg2",
+      "enable_monitor_period"};
 
     rclcpp::Time start_time = this->get_clock()->now();
 
@@ -252,50 +259,54 @@ public:
   {
     const std::string & name = parameter.get_name();
 
-    if (name == "cell_n") {
-      cell_n_ = parameter.as_int();
-      power_driver_->setCellN(cell_n_);
+    if (name == "enable_auto_transition") {
+      enable_auto_transition_ = parameter.as_bool();
+      led_driver_->setEnableAutoTransition(enable_auto_transition_);
       delay();
-    } else if (name == "ex_ems_trg") {
-      ex_ems_trg_ = parameter.as_int();
-      power_driver_->setExEmsTrg(ex_ems_trg_);
+    } else if (name == "emg_blink_period") {
+      emg_blink_period_ = parameter.as_int();
+      led_driver_->setEmgBlinkPeriod(static_cast<uint16_t>(emg_blink_period_));
       delay();
-    } else if (name == "common_ems_en") {
-      common_ems_en_ = parameter.as_bool();
-      power_driver_->setCommonEmsEn(common_ems_en_);
-      delay();
-    } else if (name == "v_limit_high") {
-      v_limit_high_ = parameter.as_double();
-      power_driver_->setVLimitHigh(v_limit_high_);
-      delay();
-    } else if (name == "v_limit_low") {
-      v_limit_low_ = parameter.as_double();
-      power_driver_->setVLimitLow(v_limit_low_);
-      delay();
-    } else if (name == "i_limit") {
-      i_limit_ = parameter.as_double();
-      power_driver_->setILimit(i_limit_);
-      delay();
+    } else if (name == "emg_color") {
+      std::vector<int64_t> emg_color = parameter.as_integer_array();
+      if (check_data_range_and_size<int64_t>(emg_color, 0, 255, M, "emg_color") == false) {
+        return false;
+      }
+      emg_color_ = emg_color;
+      for (int m = 0; m < M; m++) {
+        led_driver_->setEmgColor(
+          m, (uint8_t)(emg_color_[0]), (uint8_t)(emg_color_[1]), (uint8_t)(emg_color_[2]));
+        delay();
+      }
     } else if (name == "monitor_period") {
       monitor_period_ = parameter.as_int();
-      power_driver_->setMonitorPeriod(monitor_period_);
+      if (enable_monitor_period_) {
+        led_driver_->setMonitorPeriod(static_cast<uint16_t>(monitor_period_));
+        delay();
+      }
+    } else if (name == "monitor_reg1") {
+      monitor_reg1_ = parameter.as_int();
+      led_driver_->setMonitorReg1(static_cast<uint64_t>(monitor_reg1_));
       delay();
-    } else if (name == "monitor_reg") {
-      monitor_reg_ = parameter.as_int();
-      power_driver_->setMonitorReg(monitor_reg_);
+    } else if (name == "monitor_reg2") {
+      monitor_reg2_ = parameter.as_int();
+      led_driver_->setMonitorReg2(static_cast<uint64_t>(monitor_reg2_));
       delay();
     } else if (name == "enable_monitor_period") {
       enable_monitor_period_ = parameter.as_bool();
       if (enable_monitor_period_) {
-        power_driver_->setMonitorPeriod(monitor_period_);
+        led_driver_->setMonitorPeriod(static_cast<uint16_t>(monitor_period_));
         delay();
-        power_driver_->setMonitorReg(monitor_reg_);
+        led_driver_->setMonitorReg1(static_cast<uint64_t>(monitor_reg1_));
+        delay();
+        led_driver_->setMonitorReg2(static_cast<uint64_t>(monitor_reg2_));
+        delay();
       } else {
-        power_driver_->setMonitorPeriod(0);
+        led_driver_->setMonitorPeriod(0);
         delay();
       }
     } else {
-      RCLCPP_ERROR(this->get_logger(), "Unknown parameter: %s", name.c_str());
+      RCLCPP_WARN(this->get_logger(), "Unknown parameter: %s", name.c_str());
       return false;
     }
     return true;
@@ -304,34 +315,34 @@ public:
 private:
   rclcpp::Publisher<can_msgs::msg::Frame>::SharedPtr can_publisher_;
   rclcpp::Subscription<can_msgs::msg::Frame>::SharedPtr can_subscription_;
-  rclcpp::Subscription<sabacan_msgs::msg::SabacanPowerRef>::SharedPtr
-    sabacan_power_ref_subscription_;
-  rclcpp::Publisher<sabacan_msgs::msg::SabacanPowerStatus>::SharedPtr
-    sabacan_power_status_publisher_;
-  rclcpp::TimerBase::SharedPtr timer_;
+  rclcpp::Subscription<sabacan_msgs::msg::SabacanLEDRef>::SharedPtr sabacan_led_ref_subscription_;
+  rclcpp::Subscription<sabacan_msgs::msg::SabacanLEDMode>::SharedPtr sabacan_led_mode_subscription_;
   std::shared_ptr<CanDriver> can_driver_;
-  std::shared_ptr<PowerDriver> power_driver_;
-  std::shared_ptr<CommonDataDriver> common_data_driver_;
+  std::shared_ptr<LEDDriver> led_driver_;
   rclcpp::Service<sabacan_msgs::srv::SabacanReset>::SharedPtr reset_service_;
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr parameter_callback_handle_;
 
+  static constexpr int M = 3;
   int64_t board_id_;
-  int cell_n_;
-  int ex_ems_trg_;
-  bool common_ems_en_;
-  double v_limit_high_;
-  double v_limit_low_;
-  double i_limit_;
+
+  bool enable_auto_transition_;
+  int64_t emg_blink_period_;
+  std::vector<int64_t> emg_color_ = std::vector<int64_t>(M, 0);
   bool enable_monitor_period_;
-  int monitor_period_;
-  int64_t monitor_reg_;
+  int64_t monitor_period_;
+  int64_t monitor_reg1_;
+  int64_t monitor_reg2_;
 };
 
 int main(int argc, char * argv[])
 {
   rclcpp::init(argc, argv);
+
   auto options = rclcpp::NodeOptions();
-  rclcpp::spin(std::make_shared<SabacanPowerNode>(options));
+
+  // options をコンストラクタに渡す
+  rclcpp::spin(std::make_shared<SabacanLEDNode>(options));
+
   rclcpp::shutdown();
   return 0;
 }
