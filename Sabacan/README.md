@@ -2,4 +2,8 @@
 
 [GPIO基板の使い方](./docs/gpio.md)
 
+[電源基板の使い方](./docs/power.md)
+
+[LED基板の使い方](./docs/led.md)
+
 [example/id_rqを受信するサンプルプログラム](./docs/check_id_rq_node.md)
