@@ -75,12 +75,12 @@ public:
     can_subscription_ = this->create_subscription<can_msgs::msg::Frame>(
       "/from_can_bus", 100, std::bind(&SabacanLEDNode::can_callback, this, std::placeholders::_1));
 
-    // LED modeを取得するSubscriber
+    // LED modeのSubscriber
     sabacan_led_mode_subscription_ = this->create_subscription<sabacan_msgs::msg::SabacanLEDMode>(
       "/sabacan_led_mode" + std::to_string(board_id_), 10,
       std::bind(&SabacanLEDNode::sabacan_led_mode_callback, this, std::placeholders::_1));
 
-    // LEDの指令値を取得するSubscriber
+    // LEDの指令値のSubscriber
     sabacan_led_ref_subscription_ = this->create_subscription<sabacan_msgs::msg::SabacanLEDRef>(
       "/sabacan_led_ref" + std::to_string(board_id_), 10,
       std::bind(&SabacanLEDNode::sabacan_led_ref_callback, this, std::placeholders::_1));
@@ -236,8 +236,9 @@ public:
   void led_init()
   {
     std::vector<std::string> param_name{
-      "enable_auto_transition", "emg_blink_period", "emg_color",   "enable_monitor_period",
-      "monitor_period",         "monitor_reg1",     "monitor_reg2"};
+      "enable_auto_transition", "emg_blink_period", "emg_color",
+      "monitor_period",         "monitor_reg1",     "monitor_reg2",
+      "enable_monitor_period"};
 
     rclcpp::Time start_time = this->get_clock()->now();
 
@@ -248,7 +249,7 @@ public:
 
     rclcpp::Time end_time = this->get_clock()->now();
     RCLCPP_INFO(
-      this->get_logger(), "GPIO initialization completed in %.3f seconds",
+      this->get_logger(), "Initialization completed in %.3f seconds",
       (end_time - start_time).seconds());
   }
 
@@ -296,10 +297,17 @@ public:
       if (enable_monitor_period_) {
         led_driver_->setMonitorPeriod(static_cast<uint16_t>(monitor_period_));
         delay();
+        led_driver_->setMonitorReg1(static_cast<uint64_t>(monitor_reg1_));
+        delay();
+        led_driver_->setMonitorReg2(static_cast<uint64_t>(monitor_reg2_));
+        delay();
       } else {
         led_driver_->setMonitorPeriod(0);
         delay();
       }
+    } else {
+      RCLCPP_WARN(this->get_logger(), "Unknown parameter: %s", name.c_str());
+      return false;
     }
     return true;
   }
