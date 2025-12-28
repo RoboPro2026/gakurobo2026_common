@@ -9,8 +9,8 @@
 #include "can_msgs/msg/frame.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sabacan/sabacan.h"
+#include "sabacan_msgs/msg/sabacan_led_mode.hpp"
 #include "sabacan_msgs/msg/sabacan_led_ref.hpp"
-#include "sabacan_msgs/msg/sabacan_led_set_emg_color.hpp"
 #include "sabacan_msgs/srv/sabacan_reset.hpp"
 
 using namespace std::chrono_literals;
@@ -74,6 +74,11 @@ public:
     // CANデータ受信用のSubscriber
     can_subscription_ = this->create_subscription<can_msgs::msg::Frame>(
       "/from_can_bus", 100, std::bind(&SabacanLEDNode::can_callback, this, std::placeholders::_1));
+
+    // LED modeを取得するSubscriber
+    sabacan_led_mode_subscription_ = this->create_subscription<sabacan_msgs::msg::SabacanLEDMode>(
+      "/sabacan_led_mode" + std::to_string(board_id_), 10,
+      std::bind(&SabacanLEDNode::sabacan_led_mode_callback, this, std::placeholders::_1));
 
     // LEDの指令値を取得するSubscriber
     sabacan_led_ref_subscription_ = this->create_subscription<sabacan_msgs::msg::SabacanLEDRef>(
@@ -179,6 +184,12 @@ public:
 
     frame = can_driver_->rx_frame(msg->id, data, msg->dlc, msg->is_rtr, msg->is_extended);
     led_driver_->receive(frame);
+  }
+
+  void sabacan_led_mode_callback(const sabacan_msgs::msg::SabacanLEDMode::SharedPtr msg)
+  {
+    led_driver_->setLedMode(msg->led_mode);
+    RCLCPP_INFO(this->get_logger(), "Set LED Mode: led_mode=%d", msg->led_mode);
   }
 
   void sabacan_led_ref_callback(const sabacan_msgs::msg::SabacanLEDRef::SharedPtr msg)
@@ -297,6 +308,7 @@ private:
   rclcpp::Publisher<can_msgs::msg::Frame>::SharedPtr can_publisher_;
   rclcpp::Subscription<can_msgs::msg::Frame>::SharedPtr can_subscription_;
   rclcpp::Subscription<sabacan_msgs::msg::SabacanLEDRef>::SharedPtr sabacan_led_ref_subscription_;
+  rclcpp::Subscription<sabacan_msgs::msg::SabacanLEDMode>::SharedPtr sabacan_led_mode_subscription_;
   std::shared_ptr<CanDriver> can_driver_;
   std::shared_ptr<LEDDriver> led_driver_;
   rclcpp::Service<sabacan_msgs::srv::SabacanReset>::SharedPtr reset_service_;

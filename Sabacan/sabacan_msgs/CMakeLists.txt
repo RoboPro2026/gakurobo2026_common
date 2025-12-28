@@ -15,6 +15,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/SabacanGPIORefFloat.msg"
   "msg/SabacanGPIORefInt.msg"
   "msg/SabacanGPIOStatus.msg"
+  "msg/SabacanLEDMode.msg"
   "msg/SabacanLEDRef.msg"
   "msg/SabacanPowerRef.msg"
   "msg/SabacanPowerStatus.msg"
