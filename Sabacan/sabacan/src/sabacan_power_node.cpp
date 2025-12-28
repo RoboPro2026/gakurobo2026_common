@@ -76,6 +76,9 @@ public:
     sabacan_power_status_publisher_ = this->create_publisher<sabacan_msgs::msg::SabacanPowerStatus>(
       "/sabacan_power_status" + std::to_string(board_id_), 10);
 
+    parameter_callback_handle_ = this->add_on_set_parameters_callback(
+      std::bind(&SabacanPowerNode::parameter_callback, this, std::placeholders::_1));
+
     can_driver_ = std::make_shared<CanDriver>();
     common_data_driver_ = std::make_shared<CommonDataDriver>(can_driver_);
     power_driver_ = std::make_shared<PowerDriver>(can_driver_, board_id_);
