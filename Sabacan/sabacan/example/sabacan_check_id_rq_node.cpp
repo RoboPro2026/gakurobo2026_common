@@ -85,9 +85,9 @@ private:
     frame.len = msg->dlc;
     // リクエストを受け取ったデバイスは、Board IDに自身のID（ロータリーDIPの値）、data[0]に基板の形式を入れてData type 0x0で返す。
     if (frame.data_type == DataType::COMMON) {
-      if (frame.data[0] == DataType::DENGEN) {
+      if (frame.data[0] == DataType::POWER) {
         RCLCPP_INFO(
-          this->get_logger(), "Received data_type = DENGEN, board_id = %d", frame.board_id);
+          this->get_logger(), "Received data_type = POWER, board_id = %d", frame.board_id);
       } else if (frame.data[0] == DataType::ROBOMAS_V1) {
         RCLCPP_INFO(
           this->get_logger(), "Received data_type = ROBOMAS_V1, board_id = %d", frame.board_id);

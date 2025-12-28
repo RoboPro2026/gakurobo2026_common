@@ -10,6 +10,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include "sabacan/sabacan.h"
 #include "sabacan_msgs/msg/sabacan_power_ref.hpp"
+#include "sabacan_msgs/msg/sabacan_power_status.hpp"
 #include "sabacan_msgs/srv/sabacan_reset.hpp"
 
 using namespace std::chrono_literals;
@@ -63,7 +64,11 @@ public:
     for (int i = 0; i < 8; i++) {
       msg->data[i] = data[i];
     }
-    RCLCPP_INFO(this->get_logger(), "Sending CAN frame: ID=0x%X", msg->id);
+    RCLCPP_INFO(
+      this->get_logger(),
+      "Sending CAN frame: ID=0x%X, DLC=%d, Data=[%02X %02X %02X %02X %02X %02X %02X %02X]", msg->id,
+      msg->dlc, msg->data[0], msg->data[1], msg->data[2], msg->data[3], msg->data[4], msg->data[5],
+      msg->data[6], msg->data[7]);
     can_publisher_->publish(std::move(msg));
   }
 

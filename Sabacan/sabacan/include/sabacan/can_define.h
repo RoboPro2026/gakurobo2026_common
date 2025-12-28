@@ -42,7 +42,7 @@ struct CanFrame
 namespace DataType
 {
 constexpr uint8_t COMMON = 0x0;
-constexpr uint8_t DENGEN = 0x1;
+constexpr uint8_t POWER = 0x1;
 constexpr uint8_t ROBOMAS_V1 = 0x2;
 constexpr uint8_t GPIO = 0x3;
 constexpr uint8_t ROBOMAS_V2 = 0x4;
@@ -59,6 +59,32 @@ constexpr uint16_t RESET_EMS = 0x000F;
 
 // 各基板のバージョンごとに名前空間を定義
 // そうすることで、基板のバージョンが更新されたときに、変更コストを最小限にできる。
+
+namespace Power
+{
+constexpr uint16_t PCU_STATE = 0x0001;
+constexpr uint16_t CELL_N = 0x0002;
+constexpr uint16_t EX_EMS_TRG = 0x0003;
+constexpr uint16_t EMS_RQ = 0x0004;
+constexpr uint16_t COMMON_EMS_EN = 0x0005;
+constexpr uint16_t OUT_V = 0x0010;
+constexpr uint16_t V_LIMIT_HIGH = 0x0011;
+constexpr uint16_t V_LIMIT_LOW = 0x0012;
+constexpr uint16_t OUT_I = 0x0020;
+constexpr uint16_t I_LIMIT = 0x0021;
+constexpr uint16_t MONITOR_PERIOD = 0x00F0;
+constexpr uint16_t MONITOR_REG = 0x00F1;
+
+constexpr uint8_t PCU_STATE_EMS_BIT = 0;
+constexpr uint8_t PCU_STATE_SOFT_EMS_BIT = 1;
+constexpr uint8_t PCU_STATE_OVA_BIT = 2;
+constexpr uint8_t PCU_STATE_UVA_BIT = 3;
+constexpr uint8_t PCU_STATE_OIA_BIT = 4;
+
+constexpr uint8_t EX_EMS_TRG_OVA_EMS_EN_BIT = 2;
+constexpr uint8_t EX_EMS_TRG_UVA_EMS_EN_BIT = 3;
+constexpr uint8_t EX_EMS_TRG_OIA_EMS_EN_BIT = 4;
+}  // namespace Power
 
 namespace RobomasV1
 {
@@ -170,3 +196,18 @@ constexpr uint16_t MONITOR_PERIOD = 0xf0;
 constexpr uint16_t MONITOR_REG = 0xf1;
 
 }  // namespace GPIO
+
+namespace LED
+{
+constexpr uint16_t LED_MODE = 0x0040;
+constexpr uint16_t ENABLE_AUTO_TRANSITION = 0x0041;
+constexpr uint16_t EMG_BLINK_PERIOD = 0x0042;
+constexpr uint16_t EMG_COLOR = 0x0050;
+constexpr uint16_t LED_REF = 0x0060;
+constexpr uint16_t MONITOR_PERIOD = 0x00F0;
+constexpr uint16_t MONITOR_REG1 = 0x00F1;
+constexpr uint16_t MONITOR_REG2 = 0x00F2;
+
+constexpr uint8_t MODE_NORMAL = 0x00;
+constexpr uint8_t MODE_EMG = 0x01;
+}  // namespace LED
