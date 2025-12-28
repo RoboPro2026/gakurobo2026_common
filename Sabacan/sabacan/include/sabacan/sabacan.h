@@ -14,6 +14,6 @@
 #include "sabacan/can_define.h"
 #include "sabacan/can_device.h"
 #include "sabacan/can_device_common_data_driver.h"
-#include "sabacan/can_device_gpio.h"
+#include "sabacan/can_device_gpio_driver.h"
 #include "sabacan/can_device_robomas_driver_v1.h"
 #include "sabacan/can_device_robomas_driver_v2.h"
