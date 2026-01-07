@@ -52,6 +52,7 @@ constexpr uint8_t FORCE_READ = 0xF;
 
 namespace CommonRegisterID
 {
+constexpr uint16_t NOP = 0x0000;
 constexpr uint16_t RQ = 0x0001;
 constexpr uint16_t EMS = 0x000E;
 constexpr uint16_t RESET_EMS = 0x000F;
@@ -62,6 +63,7 @@ constexpr uint16_t RESET_EMS = 0x000F;
 
 namespace Power
 {
+constexpr uint16_t NOP = 0x0000;
 constexpr uint16_t PCU_STATE = 0x0001;
 constexpr uint16_t CELL_N = 0x0002;
 constexpr uint16_t EX_EMS_TRG = 0x0003;
@@ -88,6 +90,7 @@ constexpr uint8_t EX_EMS_TRG_OIA_EMS_EN_BIT = 4;
 
 namespace RobomasV1
 {
+constexpr uint16_t NOP = 0x0000;
 constexpr uint16_t MOTOR_TYPE = 0x01;
 constexpr uint16_t CONTROL_TYPE = 0x02;
 constexpr uint16_t GEAR_RATIO = 0x03;
@@ -129,6 +132,7 @@ constexpr float GEAR_RATIO_M3508 = 19.0f;
 
 namespace RobomasV2
 {
+constexpr uint16_t NOP = 0x0000;
 constexpr uint16_t MOTOR_STATE = 0x01;
 constexpr uint16_t CONTROL = 0x02;
 constexpr uint16_t ABS_GEAR_RATIO = 0x05;
@@ -184,7 +188,7 @@ constexpr int VESC_MODE_POSITION = 0x04;
 
 namespace GPIO
 {
-
+constexpr uint16_t NOP = 0x0000;
 constexpr uint16_t PORT_MODE = 0x01;
 constexpr uint16_t PORT_READ = 0x02;
 constexpr uint16_t PORT_WRITE = 0x03;
@@ -199,6 +203,7 @@ constexpr uint16_t MONITOR_REG = 0xf1;
 
 namespace LED
 {
+constexpr uint16_t NOP = 0x0000;
 constexpr uint16_t LED_MODE = 0x0040;
 constexpr uint16_t ENABLE_AUTO_TRANSITION = 0x0041;
 constexpr uint16_t EMG_BLINK_PERIOD = 0x0042;

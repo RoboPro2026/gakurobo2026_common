@@ -49,6 +49,7 @@ public:
     rx_frame.data_type = (id & 0xf00000) >> 20;
     rx_frame.board_id = (id & 0xf0000) >> 16;
     rx_frame.register_id = id & 0xffff;
+    rx_frame.len = dlc;
     memcpy(rx_frame.data, data, 8);
     return rx_frame;
   }
