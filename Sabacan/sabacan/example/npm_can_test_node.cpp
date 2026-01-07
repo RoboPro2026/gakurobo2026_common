@@ -14,6 +14,11 @@
 # ros2_socketcanは別ターミナルで起動しておくこと
 # 実行、board_idは実験対象のロボマス制御基板
 ros2 run sabacan npm_can_test_node --ros-args -p board_id:=2
+
+解説
+PACKET_SIZE回分のシーケンス番号を保存し、最後のデータを受信したときにパケットロスをチェックする。
+シーケンス番号が連続していなければパケットロスとカウントし、受信成功率を計算して表示する。
+もし、2秒間データが受信できなければエラーメッセージを表示する。
 */
 
 #include <chrono>
@@ -138,6 +143,7 @@ private:
       if (index == PACKET_SIZE - 1) {
         int loss_cnt = 0;
         for (int i = 1; i < PACKET_SIZE; i++) {
+          // シーケンス番号が連続していなければ、パケットロスとカウントする
           if (rx_data[i] != rx_data[i - 1] + 1) {
             loss_cnt++;
           }
