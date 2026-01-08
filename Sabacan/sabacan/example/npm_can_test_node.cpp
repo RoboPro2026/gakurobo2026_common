@@ -80,6 +80,7 @@ public:
     robomas_driver_->setMonitorReg1(0, reg);
     // monitro_periodを10msに設定
     robomas_driver_->setMonitorPeriod(1);
+    RCLCPP_INFO(this->get_logger(), "program start");
   }
 
 private:
@@ -109,8 +110,27 @@ private:
 
   void timer_callback()
   {
-    if ((this->now() - last_time_).seconds() > 2.0) {
-      RCLCPP_ERROR(this->get_logger(), "No data received few second.");
+    // if ((this->now() - last_time_).seconds() > 2.0) {
+    //   RCLCPP_ERROR(this->get_logger(), "No data received few second.");
+    // }
+    if ((this->now() - start_time_).seconds() > 10.0) {
+      int loss_cnt = 0;
+      for (int i = 1; i < rx_data.size(); i++) {
+        // シーケンス番号が連続していなければ、パケットロスとカウントする
+        if (rx_data[i] != rx_data[i - 1] + 1) {
+          loss_cnt++;
+        }
+      }
+      // 受信成功率を表示
+      if (rx_data.size() == 0) {
+        RCLCPP_INFO(this->get_logger(), "No data received");
+        exit(0);
+      }
+      double success_rate = (double)(rx_data.size() - loss_cnt) / (double)rx_data.size() * 100.0;
+      RCLCPP_INFO(
+        this->get_logger(), "CAN Received %d packets, Loss: %d packets, Success rate: %.2f%%",
+        rx_data.size(), loss_cnt, success_rate);
+      exit(0);
     }
   }
 
@@ -135,6 +155,9 @@ private:
       if (motor_num != 0) {
         return;
       }
+      rx_data.push_back(
+        frame.data[0] | (frame.data[1] << 8) | (frame.data[2] << 16) | (frame.data[3] << 24));
+      /*
       // 最終受信時刻を更新
       last_time_ = this->now();
       // データを更新
@@ -159,6 +182,7 @@ private:
       // インデックスを更新
       index = (index + 1) % PACKET_SIZE;
       // RCLCPP_INFO(this->get_logger(), "NOP Index: %d", rx_data[index - 1]);
+      */
     }
   }
 
@@ -170,9 +194,11 @@ private:
   std::shared_ptr<RobomasDriverV2> robomas_driver_;
   int64_t board_id_;
   rclcpp::Time last_time_ = this->now();
+  rclcpp::Time start_time_ = this->now();
 
-  int PACKET_SIZE = 100;
-  std::vector<int> rx_data = std::vector<int>(PACKET_SIZE, -1);
+  // int PACKET_SIZE = 100;
+  // std::vector<int> rx_data = std::vector<int>(PACKET_SIZE, -1);
+  std::vector<int> rx_data;
   int index = 0;
 };
 
