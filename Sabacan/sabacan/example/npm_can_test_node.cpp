@@ -149,7 +149,8 @@ private:
                           frame.board_id == (uint8_t)board_id_ &&
                           (frame.register_id & 0xFF) == RobomasV2::NOP;
     bool is_normal_nop = (msg->id == 0);
-    if (is_robomas_nop || is_normal_nop) {
+    // if (is_robomas_nop || is_normal_nop) {
+    if (1) {
       // motor_numが0でなければ処理しない
       int motor_num = frame.register_id >> 8;
       if (motor_num != 0) {
