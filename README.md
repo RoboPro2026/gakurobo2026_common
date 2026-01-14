@@ -23,6 +23,32 @@ sudo ./can_setup.bash
 ros2 launch ros2_socketcan socket_can_bridge.launch.xml interface:=can0
 ```
 
+## YDLIDARをbuild
+1. YDLidar-SDKをビルドする（参考：https://github.com/YDLIDAR/YDLidar-SDK/blob/master/doc/howto/how_to_build_and_install.md）
+```
+cd YDLidar-SDK
+mkdir build
+cd build
+cmake ..
+make
+sudo make install
+```
+
+2. ydlidar_ros2_driverをビルドする
+```
+colcon build --symlink-install
+```
+
+3. 必要かどうかわからないおまじない
+```
+sudo chmod 666 /dev/ttyUSB0
+```
+```
+source install/setup.bash
+
+```
+
+
 # 各種ドキュメント
 
 [sabacan(CANパッケージ)の使い方](Sabacan/README.md)
