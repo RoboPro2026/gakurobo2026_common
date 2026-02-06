@@ -30,7 +30,7 @@ ros2 run sabacan sabacan_gpio_node --ros-args \
   -p board_id:=2 \
   -p pin_type:="['OUTPUT_PWM','OUTPUT_SERVO','OUTPUT_SERVO','INPUT','INPUT','INPUT','INPUT','INPUT','OUTPUT_ESC']" \
   -p pwm_freq:="[1000, 0, 0, 0, 0, 0, 0, 0, 0]" \
-  -p servo_max_angle:="[180, 280, 180, 180, 180, 180, 180, 180, 180]"
+  -p servo_max_angle:="[180, 270, 180, 180, 180, 180, 180, 180, 180]"
 ```
 
 **主要なパラメータ:**
