@@ -44,6 +44,9 @@ cat /sys/bus/usb-serial/devices/ttyUSB0/latency_timer
 echo 1 | sudo tee /sys/bus/usb-serial/devices/ttyUSB0/latency_timer
 ```
 
+## 動かないときは
+ノートパソコンの場合、パソコンが小電力モードになっていないことを確認する。（パフォーマンス推奨）小電力モードの場合、USBデバイスが正常に動作しないことがあります。
+
 ## 3\. ノードの詳細
 
 ### パブリッシュするトピック
