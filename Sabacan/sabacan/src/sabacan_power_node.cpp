@@ -76,6 +76,12 @@ public:
     sabacan_power_status_publisher_ = this->create_publisher<sabacan_msgs::msg::SabacanPowerStatus>(
       "/sabacan_power_status" + std::to_string(board_id_), 10);
 
+    // リセットサービスサーバーの作成
+    reset_service_ = this->create_service<sabacan_msgs::srv::SabacanReset>(
+      "sabacan_power_reset",
+      std::bind(
+        &SabacanPowerNode::reset_callback, this, std::placeholders::_1, std::placeholders::_2));
+
     parameter_callback_handle_ = this->add_on_set_parameters_callback(
       std::bind(&SabacanPowerNode::parameter_callback, this, std::placeholders::_1));
 
@@ -225,6 +231,29 @@ public:
     }
 
     return result;
+  }
+
+  // リセットサービスコールバック
+  void reset_callback(
+    const std::shared_ptr<sabacan_msgs::srv::SabacanReset::Request> request,
+    std::shared_ptr<sabacan_msgs::srv::SabacanReset::Response> response)
+  {
+    (void)request;  // 未使用パラメータ警告を抑制
+    try {
+      RCLCPP_INFO(this->get_logger(), "Received reset request for Power node");
+
+      // 初期化処理を実行
+      power_init();
+
+      response->success = true;
+      response->message = "Power node reset completed successfully";
+
+      RCLCPP_INFO(this->get_logger(), "Power node reset completed");
+    } catch (const std::exception & e) {
+      response->success = false;
+      response->message = std::string("Error during Power reset: ") + e.what();
+      RCLCPP_ERROR(this->get_logger(), "Power reset failed: %s", e.what());
+    }
   }
 
   void power_init()
