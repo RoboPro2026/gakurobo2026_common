@@ -90,7 +90,7 @@ ros2 topic pub --once /sabacan_led_ref0 sabacan_msgs/msg/SabacanLEDRef \
 
 **例 (board_id=0 をリセット):**
 ```bash
-ros2 service call /sabacan_led_reset0 sabacan_msgs/srv/SabacanReset "{}"
+ros2 service call /sabacan_led_reset sabacan_msgs/srv/SabacanReset "{}"
 ```
 
 ## 6. CANトピック

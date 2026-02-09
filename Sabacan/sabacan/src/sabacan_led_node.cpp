@@ -87,7 +87,7 @@ public:
 
     // リセットサービスサーバーの作成
     reset_service_ = this->create_service<sabacan_msgs::srv::SabacanReset>(
-      "sabacan_led_reset" + std::to_string(board_id_),
+      "sabacan_led_reset",
       std::bind(
         &SabacanLEDNode::reset_callback, this, std::placeholders::_1, std::placeholders::_2));
 
@@ -208,10 +208,22 @@ public:
     const std::shared_ptr<sabacan_msgs::srv::SabacanReset::Request> request,
     std::shared_ptr<sabacan_msgs::srv::SabacanReset::Response> response)
   {
-    (void)request;
-    led_init();
-    response->success = true;
-    RCLCPP_INFO(this->get_logger(), "LED driver has been reset.");
+    (void)request;  // 未使用パラメータ警告を抑制
+    try {
+      RCLCPP_INFO(this->get_logger(), "Received reset request for LED node");
+
+      // 初期化処理を実行
+      led_init();
+
+      response->success = true;
+      response->message = "LED node reset completed successfully";
+
+      RCLCPP_INFO(this->get_logger(), "LED node reset completed");
+    } catch (const std::exception & e) {
+      response->success = false;
+      response->message = std::string("Error during LED reset: ") + e.what();
+      RCLCPP_ERROR(this->get_logger(), "LED reset failed: %s", e.what());
+    }
   }
 
   // パラメータ変更コールバック
