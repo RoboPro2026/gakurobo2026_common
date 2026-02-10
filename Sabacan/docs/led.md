@@ -24,6 +24,7 @@ ros2 run sabacan sabacan_led_node --ros-args -p board_id:=0
 
 主要なパラメータ:
   * `board_id` (int64, **必須**): 基板のCAN ID (0〜9)。
+  * `enable_initialize`（bool、デフォルト：`true`） ノード起動時にCANの初期化データを送信するか選択する。
   * `enable_auto_transition` (bool, デフォルト: true): 電源基板の状態（`PCU_STATE`）でEMGへ自動遷移する機能の有効/無効。
   * `emg_blink_period` (int64, デフォルト: 0): 非常停止時の点滅周期 [ms]。0の場合は常時点灯。
   * `emg_color` (int64配列, デフォルト: `[0x40, 0x00, 0x00]`): 非常停止時の色 `[R,G,B]`（各0〜255）。3つのRGBLEDに同じ色を設定します。

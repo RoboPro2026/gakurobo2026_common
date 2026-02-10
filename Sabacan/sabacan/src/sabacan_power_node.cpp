@@ -32,6 +32,9 @@ public:
     board_id_descriptor.integer_range[0].step = 1;
     this->declare_parameter<int64_t>("board_id", board_id_descriptor);
 
+    this->declare_parameter("enable_initialize", true);
+    this->get_parameter("enable_initialize", enable_initialize_);
+
     // 必須パラメータ'board_id'が設定されているかチェック
     try {
       this->get_parameter("board_id", board_id_);
@@ -97,7 +100,9 @@ public:
     // 100Hzのタイマーを設定
     timer_ = this->create_wall_timer(10ms, std::bind(&SabacanPowerNode::timer_callback, this));
 
-    power_init();
+    if (enable_initialize_) {
+      power_init();
+    }
   }
 
   template <typename T>
@@ -345,6 +350,7 @@ private:
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr parameter_callback_handle_;
 
   int64_t board_id_;
+  bool enable_initialize_;
   int cell_n_;
   int ex_ems_trg_;
   bool common_ems_en_;

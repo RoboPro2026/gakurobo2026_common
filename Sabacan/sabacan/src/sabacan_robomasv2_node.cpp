@@ -35,6 +35,9 @@ public:
     board_id_descriptor.integer_range[0].step = 1;
     this->declare_parameter<int64_t>("board_id", board_id_descriptor);
 
+    this->declare_parameter("enable_initialize", true);
+    this->get_parameter("enable_initialize", enable_initialize_);
+
     this->declare_parameter("motor_type", std::vector<std::string>{"C610", "C610", "C610", "C610"});
     this->declare_parameter(
       "control_type", std::vector<std::string>{"VELOCITY", "VELOCITY", "VELOCITY", "VELOCITY"});
@@ -154,7 +157,9 @@ public:
       this->create_wall_timer(10ms, std::bind(&SabacanRobomasV2Node::publish_timer_callback, this));
 
     // 初期化命令を送信
-    robomas_init();
+    if (enable_initialize_) {
+      robomas_init();
+    }
   }
 
   template <typename T>
@@ -811,6 +816,7 @@ private:
   std::map<std::string, int> vesc_mode_map_;
   // 各種データの配列
   int64_t board_id_;
+  bool enable_initialize_;
   // パラメータ、サービスで使用する変数
   std::vector<int64_t> motor_type_ = std::vector<int64_t>(N);
   std::vector<int64_t> control_type_ = std::vector<int64_t>(N);

@@ -32,6 +32,9 @@ public:
     board_id_descriptor.integer_range[0].step = 1;
     this->declare_parameter<int64_t>("board_id", board_id_descriptor);
 
+    this->declare_parameter("enable_initialize", true);
+    this->get_parameter("enable_initialize", enable_initialize_);
+
     this->declare_parameter<bool>("enable_auto_transition", true);
     this->declare_parameter<int64_t>("emg_blink_period", 0);
     // emg_color
@@ -96,7 +99,9 @@ public:
       std::bind(&SabacanLEDNode::parameter_callback, this, std::placeholders::_1));
 
     // 初期化命令を送信
-    led_init();
+    if (enable_initialize_) {
+      led_init();
+    }
   }
 
   template <typename T>
@@ -336,7 +341,7 @@ private:
 
   static constexpr int M = 3;
   int64_t board_id_;
-
+  bool enable_initialize_;
   bool enable_auto_transition_;
   int64_t emg_blink_period_;
   std::vector<int64_t> emg_color_ = std::vector<int64_t>(M, 0);

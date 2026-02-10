@@ -37,6 +37,7 @@ ros2 run sabacan sabacan_gpio_node --ros-args \
 プログラムの都合上、パラメータを変更した際に、一瞬だけ出力が止まったり、不安定な挙動になる可能性があるので注意。  
 なにか特別な理由がない限り、pin_typeやpwm_freqは動作中に変更するという運用はあまりしないほうがいいかも
   * `board_id` (int64, **必須**): 基板のCAN ID (0〜9)。
+  * `enable_initialize`（bool、デフォルト：`true`） ノード起動時にCANの初期化データを送信するか選択する。
   * `pin_type` (string配列, デフォルト: 全て `"INPUT"`):
       * `"INPUT"`: デジタル入力。
       * `"OUTPUT_PWM"`: PWM出力。

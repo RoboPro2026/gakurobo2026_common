@@ -33,6 +33,9 @@ public:
     board_id_descriptor.integer_range[0].step = 1;
     this->declare_parameter<int64_t>("board_id", board_id_descriptor);
 
+    this->declare_parameter("enable_initialize", true);
+    this->get_parameter("enable_initialize", enable_initialize_);
+
     // pin_typeの種類はINPUT, OUTPUT_PWM, OUTPUT_ESC、OUTPUT_SERVOの4つ
     this->declare_parameter(
       "pin_type",
@@ -125,7 +128,9 @@ public:
       this->create_wall_timer(10ms, std::bind(&SabacanGPIONode::publish_timer_callback, this));
 
     // 初期化命令を送信
-    gpio_init();
+    if (enable_initialize_) {
+      gpio_init();
+    }
   }
 
   template <typename T>
@@ -585,6 +590,7 @@ private:
 
   static constexpr int N = 9;
   int64_t board_id_;
+  bool enable_initialize_;
   // map
   std::map<std::string, int> pin_type_map_;
   // パラメータ、サービスで使用する変数

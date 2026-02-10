@@ -25,6 +25,7 @@ ros2 run sabacan sabacan_power_node --ros-args -p board_id:=0
 
 主要なパラメータ:
   * `board_id` (int64, **必須**): 基板のCAN ID (0〜9)。
+  * `enable_initialize`（bool、デフォルト：`true`） ノード起動時にCANの初期化データを送信するか選択する。
   * `cell_n` (int64, デフォルト: 6): リポのセル数。
   * `ex_ems_trg` (int64, デフォルト: 0): 異常時にソフトウェア非常停止を入れるかのビット設定。
     * bit2: OVA_EMS_EN, bit3: UVA_EMS_EN, bit4: OIA_EMS_EN

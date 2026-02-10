@@ -39,6 +39,7 @@ ros2 run sabacan sabacan_robomasv2_node --ros-args -p board_id:=0 \
 各種パラメータはプログラムを動作中でも、変更可能です。
 
   * `board_id` (int64, **必須**): 基板のCAN ID (0〜9)。
+  * `enable_initialize`（bool、デフォルト：`true`） ノード起動時にCANの初期化データを送信するか選択する。
   * `motor_type` (string配列): 各モーター(0〜3)の種別。
       * 選択肢: `"C610"`, `"C620"`, `"VESC"`。
       * **初期値**: `["C610", "C610", "C610", "C610"]`。
