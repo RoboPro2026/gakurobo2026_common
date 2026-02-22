@@ -137,6 +137,10 @@ public:
 
     // 角速度を計算
     double dt = current_time_.seconds() - prev_time_.seconds();
+    // dtが極端に小さいときは1パケットで2回データが更新されているので、角速度は更新しない
+    if (dt < 5e-3) {
+      return;
+    }
     double d_yaw = angle_diff(current_data_.yaw_angle, prev_data_.yaw_angle);
     double d_pitch = angle_diff(current_data_.pitch_angle, prev_data_.pitch_angle);
     double d_roll = angle_diff(current_data_.roll_angle, prev_data_.roll_angle);
