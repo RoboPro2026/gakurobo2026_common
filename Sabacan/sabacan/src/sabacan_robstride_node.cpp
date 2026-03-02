@@ -87,7 +87,7 @@ public:
     this->declare_parameter("csp_mode_limit_spd", 50.0f);
     this->declare_parameter("pp_mode_vel_max", 10.0f);
     this->declare_parameter("pp_mode_acc_set", 10.0f);
-    this->declare_parameter<int>("espcan_time_ms", 10);
+    this->declare_parameter<int>("epscan_time_ms", 10);
 
     can_driver_ = std::make_shared<CanDriver>();
     robstride_driver_ =
@@ -104,36 +104,36 @@ public:
     // CANデータ受信用のSubscription
     can_subscription_ = this->create_subscription<can_msgs::msg::Frame>(
       "/from_can_bus", 100,
-      std::bind(&SabacanRobomasV2Node::can_callback, this, std::placeholders::_1));
+      std::bind(&SabacanRobstrideNode::can_callback, this, std::placeholders::_1));
 
     // 現在のモータの状態を送信するPublisher
     sabacan_status_publisher_ = this->create_publisher<sabacan_msgs::msg::SabacanRobstrideStatus>(
-      "/sabacan_robstride_status" + std::string(board_id_), 100);
+      "/sabacan_robstride_status" + std::to_string(board_id_), 100);
 
     // モータの指令値を受け取るSubscription
     sabacan_ref_subscription_ = this->create_subscription<sabacan_msgs::msg::SabacanRobstrideRef>(
-      "/sabacan_robstride_ref" + std::string(board_id_), 100,
-      std::bind(&SabacanRobomasV2Node::ref_callback, this, std::placeholders::_1));
+      "/sabacan_robstride_ref" + std::to_string(board_id_), 100,
+      std::bind(&SabacanRobstrideNode::ref_callback, this, std::placeholders::_1));
 
     // リセットサービスサーバーの作成
     reset_service_ = this->create_service<sabacan_msgs::srv::SabacanReset>(
       "sabacan_robstride_reset",
       std::bind(
-        &SabacanRobomasV2Node::reset_callback, this, std::placeholders::_1, std::placeholders::_2));
+        &SabacanRobstrideNode::reset_callback, this, std::placeholders::_1, std::placeholders::_2));
 
     // ゲイン設定サービスサーバーの作成
-    set_gains_service_ = this->create_service<sabacan_msgs::srv::set_robstride_gains>(
+    set_gains_service_ = this->create_service<sabacan_msgs::srv::SetRobstrideGains>(
       "set_robstride_gains", std::bind(
-                               &SabacanRobomasV2Node::set_gains_callback, this,
+                               &SabacanRobstrideNode::set_gains_callback, this,
                                std::placeholders::_1, std::placeholders::_2));
 
     // パラメータ変更コールバックの設定
     parameter_callback_handle_ = this->add_on_set_parameters_callback(
-      std::bind(&SabacanRobomasV2Node::parameter_callback, this, std::placeholders::_1));
+      std::bind(&SabacanRobstrideNode::parameter_callback, this, std::placeholders::_1));
 
     // 100Hzでpublish用のtimerを呼ぶ
     publish_timer_ =
-      this->create_wall_timer(10ms, std::bind(&SabacanRobomasV2Node::publish_timer_callback, this));
+      this->create_wall_timer(10ms, std::bind(&SabacanRobstrideNode::publish_timer_callback, this));
 
     // 初期化命令を送信
     if (enable_initialize_) {
@@ -235,7 +235,8 @@ public:
       "Received CAN frame: ID=0x%X, DLC=%d, Data=[%02X %02X %02X %02X %02X %02X %02X %02X]",
       msg->id, msg->dlc, msg->data[0], msg->data[1], msg->data[2], msg->data[3], msg->data[4],
       msg->data[5], msg->data[6], msg->data[7]);
-    bool is_receive = robstride_driver_->receive(msg->id, msg->dlc, msg->is_rtr, msg->is_extended);
+    bool is_receive = robstride_driver_->receive(
+      msg->id, msg->data.data(), msg->dlc, msg->is_rtr, msg->is_extended);
     if (is_receive) {
       update_angle();
     }
@@ -272,10 +273,10 @@ public:
     // 指令値の送信
     if (msg->control_type == "MIT") {
       robstride_driver_->setOperationControlMode_MotorControlInstruction(
-        msg->mit_torque, msg->mit_angle, msg->mit_speed, msg->mit_kp, msg->mit_kd);
+        msg->mit_torque, msg->mit_pos, msg->mit_speed, msg->mit_kp, msg->mit_kd);
       RCLCPP_INFO(
-        this->get_logger(), "MIT control: torque=%f, angle=%f, speed=%f, kp=%f, kd=%f",
-        msg->mit_torque, msg->mit_angle, msg->mit_speed, msg->mit_kp, msg->mit_kd);
+        this->get_logger(), "MIT control: torque=%f, pos=%f, speed=%f, kp=%f, kd=%f",
+        msg->mit_torque, msg->mit_pos, msg->mit_speed, msg->mit_kp, msg->mit_kd);
     } else if (msg->control_type == "CURRENT") {
       robstride_driver_->setSingleParameterWrite_float(RobstrideIndex::IQ_REF, msg->current_ref);
       RCLCPP_INFO(this->get_logger(), "Current control: current_ref=%f", msg->current_ref);
@@ -283,11 +284,11 @@ public:
       robstride_driver_->setSingleParameterWrite_float(RobstrideIndex::SPD_REF, msg->velocity_ref);
       RCLCPP_INFO(this->get_logger(), "Velocity control: velocity_ref=%f", msg->velocity_ref);
     } else if (msg->control_type == "PP") {
-      robstride_driver_->setSingleParameterWrite_float(RobstrideIndex::LOC_REF, msg->pp_pos_ref);
-      RCLCPP_INFO(this->get_logger(), "PP control: pp_pos_ref=%f", msg->pp_pos_ref);
+      robstride_driver_->setSingleParameterWrite_float(RobstrideIndex::LOC_REF, msg->pp_angle_ref);
+      RCLCPP_INFO(this->get_logger(), "PP control: pp_angle_ref=%f", msg->pp_angle_ref);
     } else if (msg->control_type == "CSP") {
-      robstride_driver_->setSingleParameterWrite_float(RobstrideIndex::LOC_REF, msg->csp_pos_ref);
-      RCLCPP_INFO(this->get_logger(), "CSP control: csp_pos_ref=%f", msg->csp_pos_ref);
+      robstride_driver_->setSingleParameterWrite_float(RobstrideIndex::LOC_REF, msg->csp_angle_ref);
+      RCLCPP_INFO(this->get_logger(), "CSP control: csp_angle_ref=%f", msg->csp_angle_ref);
     }
 
     // 前回の値を更新
@@ -338,8 +339,8 @@ public:
 
   // ゲイン設定サービスのコールバック
   void set_gains_callback(
-    const std::shared_ptr<sabacan_msgs::srv::set_robstride_gains::Request> request,
-    std::shared_ptr<sabacan_msgs::srv::set_robstride_gains::Response> response)
+    const std::shared_ptr<sabacan_msgs::srv::SetRobstrideGains::Request> request,
+    std::shared_ptr<sabacan_msgs::srv::SetRobstrideGains::Response> response)
   {
     if (request->set_limit_cur) {
       this->set_parameter(rclcpp::Parameter("velocity_mode_limit_cur", request->limit_cur));
@@ -348,6 +349,7 @@ public:
       RCLCPP_INFO(this->get_logger(), "Set limit_cur to %f", request->limit_cur);
     }
     response->success = true;
+    response->message = "ok";
   }
 
   void delay() { std::this_thread::sleep_for(10ms); }
@@ -361,7 +363,7 @@ public:
       "csp_mode_limit_spd",
       "pp_mode_vel_max",
       "pp_mode_acc_set",
-      "espcan_time_ms"
+      "epscan_time_ms"
     };
     // clang-format on
 
@@ -418,11 +420,11 @@ public:
       pp_mode_acc_set_ = parameter.as_double();
       robstride_driver_->setSingleParameterWrite_float(RobstrideIndex::ACC_SET, pp_mode_acc_set_);
       delay();
-    } else if (parameter.get_name() == "espcan_time_ms") {
-      // espcan_timeの初期値は10msで1
+    } else if (parameter.get_name() == "epscan_time_ms") {
+      // epscan_timeの初期値は10msで1
       // 5ms増えるとepscan_timeが1増えるようにする
       epscan_time_ = (parameter.as_int() - 5) / 5;
-      robstride_driver_->setSingleParameterWrite_uint16(RobstrideIndex::ESPCAN_TIME, epscan_time_);
+      robstride_driver_->setSingleParameterWrite_uint16(RobstrideIndex::EPSCAN_TIME, epscan_time_);
       delay();
     } else {
       RCLCPP_ERROR(this->get_logger(), "Unknown parameter: %s", parameter.get_name().c_str());
@@ -436,7 +438,7 @@ public:
   rclcpp::Subscription<sabacan_msgs::msg::SabacanRobstrideRef>::SharedPtr sabacan_ref_subscription_;
   rclcpp::Publisher<sabacan_msgs::msg::SabacanRobstrideStatus>::SharedPtr sabacan_status_publisher_;
   rclcpp::Service<sabacan_msgs::srv::SabacanReset>::SharedPtr reset_service_;
-  rclcpp::Service<sabacan_msgs::srv::set_robstride_gains>::SharedPtr set_gains_service_;
+  rclcpp::Service<sabacan_msgs::srv::SetRobstrideGains>::SharedPtr set_gains_service_;
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr parameter_callback_handle_;
   rclcpp::TimerBase::SharedPtr publish_timer_;
   std::shared_ptr<CanDriver> can_driver_;
