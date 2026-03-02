@@ -21,6 +21,7 @@ add_executable(sabacan_gpio_node src/sabacan_gpio_node.cpp)
 add_executable(sabacan_power_node src/sabacan_power_node.cpp)
 add_executable(sabacan_robomas_node src/sabacan_robomas_node.cpp)
 add_executable(sabacan_robomasv2_node src/sabacan_robomasv2_node.cpp)
+add_executable(sabacan_robstride_node src/sabacan_robstride_node.cpp)
 
 ament_target_dependencies(npm_can_test_node rclcpp can_msgs std_msgs sabacan_msgs)
 ament_target_dependencies(sabacan_check_id_rq_node rclcpp can_msgs std_msgs sabacan_msgs)
@@ -29,6 +30,7 @@ ament_target_dependencies(sabacan_gpio_node rclcpp can_msgs std_msgs sabacan_msg
 ament_target_dependencies(sabacan_power_node rclcpp can_msgs std_msgs sabacan_msgs)
 ament_target_dependencies(sabacan_robomas_node rclcpp can_msgs std_msgs sabacan_msgs)
 ament_target_dependencies(sabacan_robomasv2_node rclcpp can_msgs std_msgs sabacan_msgs)
+ament_target_dependencies(sabacan_robstride_node rclcpp can_msgs std_msgs sabacan_msgs)
 
 # インクルードディレクトリを設定
 target_include_directories(npm_can_test_node PUBLIC
@@ -66,6 +68,11 @@ target_include_directories(sabacan_robomasv2_node PUBLIC
   $<INSTALL_INTERFACE:include>
 )
 
+target_include_directories(sabacan_robstride_node PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+
 # Install targets
 install(TARGETS
   npm_can_test_node
@@ -75,6 +82,7 @@ install(TARGETS
   sabacan_power_node
   sabacan_robomas_node
   sabacan_robomasv2_node
+  sabacan_robstride_node
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
