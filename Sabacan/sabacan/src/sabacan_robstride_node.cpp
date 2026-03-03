@@ -313,9 +313,9 @@ public:
     status_msg.speed = robstride_driver_->speed;
     status_msg.pos = integrated_current_angle_;
     sabacan_status_publisher_->publish(status_msg);
-    RCLCPP_INFO(
-      this->get_logger(), "Publishing status: torque=%f, speed=%f, pos=%f", status_msg.torque,
-      status_msg.speed, status_msg.pos);
+    // RCLCPP_INFO(
+    //   this->get_logger(), "Publishing status: torque=%f, speed=%f, pos=%f", status_msg.torque,
+    //   status_msg.speed, status_msg.pos);
   }
 
   // パラメータ変更コールバック
