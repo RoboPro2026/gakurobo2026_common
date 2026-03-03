@@ -13,8 +13,8 @@ cd /path/to/ros2_ws
 colcon build --packages-select sabacan_msgs sabacan
 source install/setup.bash
 
-# ノード起動 (board_id=0 の例)
-ros2 run sabacan sabacan_robstride_node --ros-args -p board_id:=0
+# ノード起動 (board_id=127 の例)
+ros2 run sabacan sabacan_robstride_node --ros-args -p board_id:=127
 ```
 
 > **補足**
@@ -69,9 +69,9 @@ float32 csp_angle_ref
 - `"PP"`: `pp_angle_ref` を使用
 - `"CSP"`: `csp_angle_ref` を使用
 
-例: MIT 指令（board_id=0）
+例: MIT 指令（board_id=127）
 ```bash
-ros2 topic pub -r 100 /sabacan_robstride_ref0 sabacan_msgs/msg/SabacanRobstrideRef "{
+ros2 topic pub -r 100 /sabacan_robstride_ref127 sabacan_msgs/msg/SabacanRobstrideRef "{
   control_type: 'MIT',
   mit_torque: 0.2,
   mit_pos: 0.0,
@@ -81,17 +81,17 @@ ros2 topic pub -r 100 /sabacan_robstride_ref0 sabacan_msgs/msg/SabacanRobstrideR
 }"
 ```
 
-例: 速度指令（board_id=0）
+例: 速度指令（board_id=127）
 ```bash
-ros2 topic pub -r 100 /sabacan_robstride_ref0 sabacan_msgs/msg/SabacanRobstrideRef "{
+ros2 topic pub -r 100 /sabacan_robstride_ref127 sabacan_msgs/msg/SabacanRobstrideRef "{
   control_type: 'VELOCITY',
   velocity_ref: 5.0
 }"
 ```
 
-例: PP 位置指令（board_id=0）
+例: PP 位置指令（board_id=127）
 ```bash
-ros2 topic pub -r 100 /sabacan_robstride_ref0 sabacan_msgs/msg/SabacanRobstrideRef "{
+ros2 topic pub -r 100 /sabacan_robstride_ref127 sabacan_msgs/msg/SabacanRobstrideRef "{
   control_type: 'PP',
   pp_angle_ref: 1.57
 }"
@@ -109,9 +109,9 @@ float32 speed  # rad/s
 float32 pos    # rad
 ```
 
-例（board_id=0）:
+例（board_id=127）:
 ```bash
-ros2 topic echo /sabacan_robstride_status0
+ros2 topic echo /sabacan_robstride_status127
 ```
 
 > **pos について**

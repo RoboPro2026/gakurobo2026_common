@@ -90,13 +90,12 @@ public:
     this->declare_parameter<int>("epscan_time_ms", 10);
 
     can_driver_ = std::make_shared<CanDriver>();
-    robstride_driver_ =
-      std::make_shared<RobstrideDriver>(can_driver_, board_id_, can_master_id_, robstride_type_);
-
     can_driver_->register_tx_callback(
       [this](uint32_t id, uint8_t * data, uint8_t dlc, bool is_remote, bool is_ext) {
         this->tx(id, data, dlc, is_remote, is_ext);
       });
+    robstride_driver_ =
+      std::make_shared<RobstrideDriver>(can_driver_, board_id_, can_master_id_, robstride_type_);
 
     // CANデータ送信用のPublisher
     can_publisher_ = this->create_publisher<can_msgs::msg::Frame>("/to_can_bus", 100);
@@ -303,9 +302,9 @@ public:
     status_msg.speed = robstride_driver_->speed;
     status_msg.pos = integrated_current_angle_;
     sabacan_status_publisher_->publish(status_msg);
-    RCLCPP_INFO(
-      this->get_logger(), "Publishing status: torque=%f, speed=%f, pos=%f", status_msg.torque,
-      status_msg.speed, status_msg.pos);
+    // RCLCPP_INFO(
+    //   this->get_logger(), "Publishing status: torque=%f, speed=%f, pos=%f", status_msg.torque,
+    //   status_msg.speed, status_msg.pos);
   }
 
   // パラメータ変更コールバック
