@@ -21,8 +21,11 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/SabacanPowerStatus.msg"
   "msg/SabacanRobomasRef.msg"
   "msg/SabacanRobomasStatus.msg"
+  "msg/SabacanRobstrideRef.msg"
+  "msg/SabacanRobstrideStatus.msg"
   "srv/SabacanReset.srv"
   "srv/SetRobomasGains.srv"
+  "srv/SetRobstrideGains.srv"
   DEPENDENCIES std_msgs
 )
 

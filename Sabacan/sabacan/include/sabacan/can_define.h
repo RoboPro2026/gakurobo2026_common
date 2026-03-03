@@ -216,3 +216,52 @@ constexpr uint16_t MONITOR_REG2 = 0x00F2;
 constexpr uint8_t MODE_NORMAL = 0x00;
 constexpr uint8_t MODE_EMG = 0x01;
 }  // namespace LED
+
+namespace RS05
+{
+constexpr float P_MIN = -12.57f;
+constexpr float P_MAX = 12.57f;
+constexpr float V_MIN = -50.0f;
+constexpr float V_MAX = 50.0f;
+constexpr float KP_MIN = 0.0f;
+constexpr float KP_MAX = 500.0f;
+constexpr float KD_MIN = 0.0f;
+constexpr float KD_MAX = 5.0f;
+constexpr float T_MIN = -6.0f;
+constexpr float T_MAX = 6.0f;
+}  // namespace RS05
+
+enum class RobstrideType
+{
+  RS05,
+  EL05,
+};
+
+namespace RobstrideIndex
+{
+constexpr uint16_t RUN_MODE = 0x7005;
+constexpr uint16_t IQ_REF = 0x7006;
+constexpr uint16_t SPD_REF = 0x700A;
+constexpr uint16_t LIMIT_TORQUE = 0x700B;
+constexpr uint16_t CUR_KP = 0x7010;
+constexpr uint16_t CUR_KI = 0x7011;
+constexpr uint16_t CUR_FILT_GAIN = 0x7014;
+constexpr uint16_t LOC_REF = 0x7016;
+constexpr uint16_t LIMIT_SPD = 0x7017;
+constexpr uint16_t LIMIT_CUR = 0x7018;
+constexpr uint16_t MECH_POS = 0x7019;
+constexpr uint16_t IQF = 0x701A;
+constexpr uint16_t MECH_VEL = 0x701B;
+constexpr uint16_t VBUS = 0x701C;
+constexpr uint16_t LOC_KP = 0x701E;
+constexpr uint16_t SPD_KP = 0x701F;
+constexpr uint16_t SPD_KI = 0x7020;
+constexpr uint16_t SPD_FILT_GAIN = 0x7021;
+constexpr uint16_t ACC_RAD = 0x7022;
+constexpr uint16_t VEL_MAX = 0x7024;
+constexpr uint16_t ACC_SET = 0x7025;
+constexpr uint16_t EPSCAN_TIME = 0x7026;
+constexpr uint16_t CAN_TIMEOUT = 0x7028;
+constexpr uint16_t ZERO_STA = 0x7029;
+constexpr uint16_t ADD_OFFSET = 0x702B;
+};

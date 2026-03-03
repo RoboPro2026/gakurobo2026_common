@@ -1,0 +1,15 @@
+string control_type
+# MITモードの指令値
+float32 mit_torque
+float32 mit_pos
+float32 mit_speed
+float32 mit_kp
+float32 mit_kd
+# 電流モードの指令値
+float32 current_ref
+# 速度モードの指令値
+float32 velocity_ref
+# 位置制御モード(PP)の指令値
+float32 pp_angle_ref
+# 位置制御モード(CSP)の指令値
+float32 csp_angle_ref
