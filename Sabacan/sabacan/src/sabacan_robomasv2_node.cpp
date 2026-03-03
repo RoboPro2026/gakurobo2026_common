@@ -479,12 +479,40 @@ private:
         delay();
         robomas_driver_->setSpeedLim(n, speed_lim_[n]);
         delay();
+        this->set_parameter(rclcpp::Parameter("pos_gain_p", pos_gain_p_));
+        this->set_parameter(rclcpp::Parameter("pos_gain_i", pos_gain_i_));
+        this->set_parameter(rclcpp::Parameter("pos_gain_d", pos_gain_d_));
         this->set_parameter(rclcpp::Parameter("speed_lim", speed_lim_));
       }
 
       if (request->set_abs_turn_cnt) {
         abs_turn_cnt_[n] = request->abs_turn_cnt;
         robomas_driver_->setAbsTurnCnt(n, abs_turn_cnt_[n]);
+        this->set_parameter(rclcpp::Parameter("abs_turn_cnt", abs_turn_cnt_));
+        delay();
+      }
+
+      if (request->set_speed_limit) {
+        if (request->speed_lim < 0.0) {
+          response->message = "Invalid speed lim";
+          response->success = false;
+          return;
+        }
+        speed_lim_[n] = request->speed_lim;
+        robomas_driver_->setSpeedLim(n, speed_lim_[n]);
+        this->set_parameter(rclcpp::Parameter("speed_lim", speed_lim_));
+        delay();
+      }
+
+      if (request->set_torque_limit) {
+        if (request->torque_lim < 0.0) {
+          response->message = "Invalid torque lim";
+          response->success = false;
+          return;
+        }
+        torque_lim_[n] = request->torque_lim;
+        robomas_driver_->setTorqueLimit(n, torque_lim_[n]);
+        this->set_parameter(rclcpp::Parameter("torque_lim", torque_lim_));
         delay();
       }
 
@@ -523,7 +551,7 @@ private:
 
   /**
    * @brief パラメータを更新する。
-   * 値の代入と値が正しいかを判別するロジックが混ざっているが、分けると実装料が増えて逆に管理が大変になると考えたため。
+   * 値の代入と値が正しいかを判別するロジックが混ざっているが、分けると実装量が増えて逆に管理が大変になると考えたため。
    *
    * @param parameter
    * @return true

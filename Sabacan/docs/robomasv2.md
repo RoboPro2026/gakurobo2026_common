@@ -148,21 +148,72 @@ monitor_reg周りでトラブルが発生したら、トラブルシューティ
 `/set_robomas_gains` サービス (型: `sabacan_msgs/srv/SetRobomasGains`) を呼び出して、ゲインやDOBパラメータを変更します。ROSパラメータ (`ros2 param set`) を用いても変更することができます。
 
   * **リクエスト:**
-      * `motor_number` (uint8)。
-      * 変更したいパラメータの値 (例: `speed_gain_p`)。
-      * 変更を有効にするフラグ (例: `set_speed_gains: true`)。
-  * **例: ゲイン変更 (board\_id=0, モーター0)**
+      * `motor_number` (uint8): 対象モーター番号（0〜3）。
+      * 変更を有効にするフラグ（例: `set_speed_gains: true`）。
+      * 変更したいパラメータの値（例: `speed_gain_p`）。
+      * **注意**:
+          * `set_speed_gains: true` のときは、`speed_gain_*` に加えて `torque_lim` も同時に設定されます。
+          * `set_pos_gains: true` のときは、`pos_gain_*` に加えて `speed_lim` も同時に設定されます。
+
+  * **例: 速度PIDゲインの設定（+ トルク制限値）(board\_id=0, モーター0)**
     ```bash
     ros2 service call /set_robomas_gains sabacan_msgs/srv/SetRobomasGains '{
       motor_number: 0,
       set_speed_gains: true,
       speed_gain_p: 0.6,
       speed_gain_i: 0.3,
-      torque_lim: 6.0,
+      speed_gain_d: 0.0,
+      torque_lim: 6.0
+    }'
+    ```
+
+  * **例: 位置PIDゲインの設定（+ 速度制限値）(board\_id=0, モーター0)**
+    ```bash
+    ros2 service call /set_robomas_gains sabacan_msgs/srv/SetRobomasGains '{
+      motor_number: 0,
+      set_pos_gains: true,
+      pos_gain_p: 6.0,
+      pos_gain_i: 3.0,
+      pos_gain_d: 0.0,
+      speed_lim: 30.0
+    }'
+    ```
+
+  * **例: 速度制限値の設定（speed\_limのみ）(board\_id=0, モーター0)**
+    ```bash
+    ros2 service call /set_robomas_gains sabacan_msgs/srv/SetRobomasGains '{
+      motor_number: 0,
+      set_speed_limit: true,
+      speed_lim: 20.0
+    }'
+    ```
+
+  * **例: トルク制限値の設定（torque\_limのみ）(board\_id=0, モーター0)**
+    ```bash
+    ros2 service call /set_robomas_gains sabacan_msgs/srv/SetRobomasGains '{
+      motor_number: 0,
+      set_torque_limit: true,
+      torque_lim: 6.0
+    }'
+    ```
+
+  * **例: 外乱オブザーバー（DOB）パラメータ設定 (board\_id=0, モーター0)**
+    ```bash
+    ros2 service call /set_robomas_gains sabacan_msgs/srv/SetRobomasGains '{
+      motor_number: 0,
       set_dob_param: true,
       dob_load_j: 0.0006,
       dob_load_d: 0.0005,
       dob_cutoff_freq: 10.0
+    }'
+    ```
+
+  * **例: アブソエンコーダの回転回数（turn count）の設定 (board\_id=0, モーター0)**
+    ```bash
+    ros2 service call /set_robomas_gains sabacan_msgs/srv/SetRobomasGains '{
+      motor_number: 0,
+      set_abs_turn_cnt: true,
+      abs_turn_cnt: 0
     }'
     ```
 
