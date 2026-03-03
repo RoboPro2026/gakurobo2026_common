@@ -69,7 +69,14 @@ float32 csp_angle_ref
 - `"PP"`: `pp_angle_ref` を使用
 - `"CSP"`: `csp_angle_ref` を使用
 
+各種モードの説明はデータシートを読んでください。  
+
 例: MIT 指令（board_id=127）
+$$
+\tau = K_p (\theta_{ref} - \theta) + K_d (v_{ref} - v) + \tau_{ff}
+$$
+
+MITモードの場合、位置の指令値に入れられる範囲はRobstride 05の場合、-12.54radから12.54radに制限されるので注意。MITモードは無限回転には対応していません。
 ```bash
 ros2 topic pub --once /sabacan_robstride_ref127 sabacan_msgs/msg/SabacanRobstrideRef "{
   control_type: 'MIT',
@@ -89,7 +96,10 @@ ros2 topic pub --once /sabacan_robstride_ref127 sabacan_msgs/msg/SabacanRobstrid
 }"
 ```
 
-例: 速度指令（board_id=127）
+例: 速度指令（board_id=127）  
+このモードでは台形加速をして、指令値に追従する。  
+最大電流は`velocity_mode_limit_cur`で制限される。  
+加速度は`velocity_mode_acc_rad`となる。
 ```bash
 ros2 topic pub --once /sabacan_robstride_ref127 sabacan_msgs/msg/SabacanRobstrideRef "{
   control_type: 'VELOCITY',
@@ -98,6 +108,9 @@ ros2 topic pub --once /sabacan_robstride_ref127 sabacan_msgs/msg/SabacanRobstrid
 ```
 
 例: PP 位置指令（board_id=127）
+なめらか加速をして位置に追従する。  
+最大速度は`pp_mode_vel_max`となる。  
+加速度は`pp_mode_acc_set`となる。
 ```bash
 ros2 topic pub --once /sabacan_robstride_ref127 sabacan_msgs/msg/SabacanRobstrideRef "{
   control_type: 'PP',
@@ -106,6 +119,8 @@ ros2 topic pub --once /sabacan_robstride_ref127 sabacan_msgs/msg/SabacanRobstrid
 ```
 
 例: CSP 位置指令（board_id=127）
+最大速度で位置に追従する。
+最大速度は`csp_mode_limit_spd`となる。
 ```bash
 ros2 topic pub --once /sabacan_robstride_ref127 sabacan_msgs/msg/SabacanRobstrideRef "{
   control_type: 'CSP',
