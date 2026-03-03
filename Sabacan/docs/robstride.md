@@ -119,7 +119,7 @@ ros2 topic pub --once /sabacan_robstride_ref127 sabacan_msgs/msg/SabacanRobstrid
 
 ### 3.5 CSP 位置指令（board_id=127）
 最大速度で位置に追従する。
-最大速度は`csp_mode_limit_spd`となる。速度はPPモードとは異なり、急激に変化する。
+最大速度は`csp_mode_limit_spd`となる。PPモードとは異なり、速度は急激に変化する。
 ```bash
 ros2 topic pub --once /sabacan_robstride_ref127 sabacan_msgs/msg/SabacanRobstrideRef "{
   control_type: 'CSP',
