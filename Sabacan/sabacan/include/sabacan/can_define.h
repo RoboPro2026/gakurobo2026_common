@@ -227,9 +227,23 @@ constexpr float KP_MIN = 0.0f;
 constexpr float KP_MAX = 500.0f;
 constexpr float KD_MIN = 0.0f;
 constexpr float KD_MAX = 5.0f;
+constexpr float T_MIN = -5.5f;
+constexpr float T_MAX = 5.5f;
+}  // namespace RS05
+
+namespace EL05
+{
+constexpr float P_MIN = -12.57f;
+constexpr float P_MAX = 12.57f;
+constexpr float V_MIN = -50.0f;
+constexpr float V_MAX = 50.0f;
+constexpr float KP_MIN = 0.0f;
+constexpr float KP_MAX = 500.0f;
+constexpr float KD_MIN = 0.0f;
+constexpr float KD_MAX = 5.0f;
 constexpr float T_MIN = -6.0f;
 constexpr float T_MAX = 6.0f;
-}  // namespace RS05
+}  // namespace EL05
 
 enum class RobstrideType
 {
@@ -264,4 +278,4 @@ constexpr uint16_t EPSCAN_TIME = 0x7026;
 constexpr uint16_t CAN_TIMEOUT = 0x7028;
 constexpr uint16_t ZERO_STA = 0x7029;
 constexpr uint16_t ADD_OFFSET = 0x702B;
-};
+};  // namespace RobstrideIndex

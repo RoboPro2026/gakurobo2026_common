@@ -102,12 +102,18 @@ public:
     float torque, float angle, float speed, float kp, float kd)
   {
     uint16_t u16_angle = 0, u16_speed = 0, u16_torque = 0, u16_kp = 0, u16_kd = 0;
-    if (robstride_type == RobstrideType::RS05 || robstride_type == RobstrideType::EL05) {
+    if (robstride_type == RobstrideType::RS05) {
       u16_torque = float_to_uint(torque, RS05::T_MIN, RS05::T_MAX, 16);
       u16_angle = float_to_uint(angle, RS05::P_MIN, RS05::P_MAX, 16);
       u16_speed = float_to_uint(speed, RS05::V_MIN, RS05::V_MAX, 16);
       u16_kp = float_to_uint(kp, RS05::KP_MIN, RS05::KP_MAX, 16);
       u16_kd = float_to_uint(kd, RS05::KD_MIN, RS05::KD_MAX, 16);
+    } else if (robstride_type == RobstrideType::EL05) {
+      u16_torque = float_to_uint(torque, EL05::T_MIN, EL05::T_MAX, 16);
+      u16_angle = float_to_uint(angle, EL05::P_MIN, EL05::P_MAX, 16);
+      u16_speed = float_to_uint(speed, EL05::V_MIN, EL05::V_MAX, 16);
+      u16_kp = float_to_uint(kp, EL05::KP_MIN, EL05::KP_MAX, 16);
+      u16_kd = float_to_uint(kd, EL05::KD_MIN, EL05::KD_MAX, 16);
     }
     uint32_t id = 0x1 << 24 | u16_torque << 8 | can_id;
     uint8_t data[8] = {0};
@@ -269,9 +275,15 @@ public:
   void receiveMotorFeedbackData(uint32_t id, uint8_t * data)
   {
     motor_mode_status = (id >> 22) & 0x3;
-    angle = uint16_to_float((data[0] << 8) | data[1], RS05::P_MIN, RS05::P_MAX, 16);
-    speed = uint16_to_float((data[2] << 8) | data[3], RS05::V_MIN, RS05::V_MAX, 16);
-    torque = uint16_to_float((data[4] << 8) | data[5], RS05::T_MIN, RS05::T_MAX, 16);
+    if (robstride_type == RobstrideType::RS05) {
+      angle = uint16_to_float((data[0] << 8) | data[1], RS05::P_MIN, RS05::P_MAX, 16);
+      speed = uint16_to_float((data[2] << 8) | data[3], RS05::V_MIN, RS05::V_MAX, 16);
+      torque = uint16_to_float((data[4] << 8) | data[5], RS05::T_MIN, RS05::T_MAX, 16);
+    } else if (robstride_type == RobstrideType::EL05) {
+      angle = uint16_to_float((data[0] << 8) | data[1], EL05::P_MIN, EL05::P_MAX, 16);
+      speed = uint16_to_float((data[2] << 8) | data[3], EL05::V_MIN, EL05::V_MAX, 16);
+      torque = uint16_to_float((data[4] << 8) | data[5], EL05::T_MIN, EL05::T_MAX, 16);
+    }
     temperature = (float)((data[6] << 8) | data[7]) * 0.1;
   }
 

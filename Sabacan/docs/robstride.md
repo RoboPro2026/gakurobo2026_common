@@ -47,18 +47,18 @@ ros2 run sabacan sabacan_robstride_node --ros-args -p board_id:=127
 ```text
 string control_type
 # MITモードの指令値
-float32 mit_torque
-float32 mit_pos
-float32 mit_speed
-float32 mit_kp
-float32 mit_kd
-# 電流モードの指令値
+float32 mit_torque # (RS05の場合は-5.5~5.5, EL05の場合は-6.0~6.0 N)
+float32 mit_pos # (RS05とEL05の場合は-4pi~4pi rad)
+float32 mit_speed # (RS05とEL05の場合は-50.0~50.0rad/s)
+float32 mit_kp # (RS05とEL05の場合は0.0~500.0)
+float32 mit_kd # (RS05とEL 0.0~500.0)
+# 電流モードの指令値（範囲の制限なし）
 float32 current_ref
-# 速度モードの指令値
+# 速度モードの指令値（範囲の制限なし）
 float32 velocity_ref
-# 位置制御モード(PP)の指令値
+# 位置制御モード(PP)の指令値（範囲の制限なし）
 float32 pp_angle_ref
-# 位置制御モード(CSP)の指令値
+# 位置制御モード(CSP)の指令値（範囲の制限なし）
 float32 csp_angle_ref
 ```
 
@@ -108,6 +108,7 @@ ros2 topic pub --once /sabacan_robstride_ref127 sabacan_msgs/msg/SabacanRobstrid
 ```
 
 ### 3.4 PP 位置指令（board_id=127）
+位置指令値は無限回転に対応。
 なめらかに加速をし、指定した位置に移動する。  
 移動時の最大速度は`pp_mode_vel_max`となり、速度は加速度`pp_mode_acc_set`で変化する。
 ```bash
@@ -118,6 +119,7 @@ ros2 topic pub --once /sabacan_robstride_ref127 sabacan_msgs/msg/SabacanRobstrid
 ```
 
 ### 3.5 CSP 位置指令（board_id=127）
+位置指令値は無限回転に対応。
 最大速度で位置に追従する。
 最大速度は`csp_mode_limit_spd`となる。PPモードとは異なり、速度は急激に変化する。
 ```bash
