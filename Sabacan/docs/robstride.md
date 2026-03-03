@@ -108,7 +108,7 @@ ros2 topic pub --once /sabacan_robstride_ref127 sabacan_msgs/msg/SabacanRobstrid
 ```
 
 ### 3.4 PP 位置指令（board_id=127）
-なめらかに加速をし、指定した位置に追移動する。  
+なめらかに加速をし、指定した位置に移動する。  
 移動時の最大速度は`pp_mode_vel_max`となり、速度は加速度`pp_mode_acc_set`で変化する。
 ```bash
 ros2 topic pub --once /sabacan_robstride_ref127 sabacan_msgs/msg/SabacanRobstrideRef "{
