@@ -63,7 +63,7 @@ float32 csp_angle_ref
 ```
 
 `control_type` は以下のいずれかを指定します:
-- `"MIT"`: `mit_*` を使用
+- `"MIT"`: `mit_torque`, `mit_pos`, `mit_speed`, `mit_kp`, `mit_kd` を使用
 - `"CURRENT"`: `current_ref` を使用
 - `"VELOCITY"`: `velocity_ref` を使用
 - `"PP"`: `pp_angle_ref` を使用
@@ -71,12 +71,12 @@ float32 csp_angle_ref
 
 各種モードの説明はデータシートを読んでください。  
 
-例: MIT 指令（board_id=127）
+### 3.1 MIT 指令（board_id=127）
 $$
 \tau = K_p (\theta_{ref} - \theta) + K_d (v_{ref} - v) + \tau_{ff}
 $$
-
-MITモードの場合、位置の指令値に入れられる範囲はRobstride 05の場合、-12.54radから12.54radに制限されるので注意。MITモードは無限回転には対応していません。
+MITモードとは、位置、速度、トルク（FF）の指令値を同時に入力できる制御。  
+MITモードの場合、位置の指令値に入れられる範囲はRobstride 05の場合、-12.54radから12.54radに制限されるので、MITモードは無限回転には対応していません。
 ```bash
 ros2 topic pub --once /sabacan_robstride_ref127 sabacan_msgs/msg/SabacanRobstrideRef "{
   control_type: 'MIT',
@@ -88,7 +88,7 @@ ros2 topic pub --once /sabacan_robstride_ref127 sabacan_msgs/msg/SabacanRobstrid
 }"
 ```
 
-例: 電流指令（board_id=127）
+### 3.2 電流指令（board_id=127）
 ```bash
 ros2 topic pub --once /sabacan_robstride_ref127 sabacan_msgs/msg/SabacanRobstrideRef "{
   control_type: 'CURRENT',
@@ -96,7 +96,7 @@ ros2 topic pub --once /sabacan_robstride_ref127 sabacan_msgs/msg/SabacanRobstrid
 }"
 ```
 
-例: 速度指令（board_id=127）  
+### 3.3 速度指令（board_id=127）  
 このモードでは台形加速をして、指令値に追従する。  
 最大電流は`velocity_mode_limit_cur`で制限される。  
 加速度は`velocity_mode_acc_rad`となる。
@@ -107,10 +107,9 @@ ros2 topic pub --once /sabacan_robstride_ref127 sabacan_msgs/msg/SabacanRobstrid
 }"
 ```
 
-例: PP 位置指令（board_id=127）
-なめらか加速をして位置に追従する。  
-最大速度は`pp_mode_vel_max`となる。  
-加速度は`pp_mode_acc_set`となる。
+### 3.4 PP 位置指令（board_id=127）
+なめらかに加速をし、指定した位置に追移動する。  
+移動時の最大速度は`pp_mode_vel_max`となり、速度は加速度`pp_mode_acc_set`で変化する。
 ```bash
 ros2 topic pub --once /sabacan_robstride_ref127 sabacan_msgs/msg/SabacanRobstrideRef "{
   control_type: 'PP',
@@ -118,9 +117,9 @@ ros2 topic pub --once /sabacan_robstride_ref127 sabacan_msgs/msg/SabacanRobstrid
 }"
 ```
 
-例: CSP 位置指令（board_id=127）
+### 3.5 CSP 位置指令（board_id=127）
 最大速度で位置に追従する。
-最大速度は`csp_mode_limit_spd`となる。
+最大速度は`csp_mode_limit_spd`となる。速度はPPモードとは異なり、急激に変化する。
 ```bash
 ros2 topic pub --once /sabacan_robstride_ref127 sabacan_msgs/msg/SabacanRobstrideRef "{
   control_type: 'CSP',
@@ -135,6 +134,8 @@ ros2 topic pub --once /sabacan_robstride_ref127 sabacan_msgs/msg/SabacanRobstrid
 
 メッセージ定義:
 ```text
+string control_type # 制御方式
+string motor_mode_status # 現在のmode、RESET, CALIBURATION,RUNの3つ
 float32 torque # Nm
 float32 speed  # rad/s
 float32 pos    # rad
