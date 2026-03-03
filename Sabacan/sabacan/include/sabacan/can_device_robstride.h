@@ -19,6 +19,7 @@ class RobstrideDriver : public CanDevice
 public:
   uint8_t can_id = 0;
   uint8_t can_master_id = 0;
+  uint8_t motor_mode_status = 0;
   float torque = 0.0f;
   float speed = 0.0f;
   float angle = 0.0f;
@@ -171,7 +172,7 @@ public:
     data[3] = 4;
     data[4] = 5;
     data[5] = 6;
-    data[6] = enable ? 0 : 1;
+    data[6] = enable ? 1 : 0;
     // data[7]は何を送ればいいかわからないので、適当に0を送信
     data[7] = 0;
     uint8_t dlc = 8;
@@ -210,8 +211,18 @@ public:
 
   void setSingleParameterWrite_uint8(uint16_t index, uint8_t value)
   {
-    uint32_t u32_value = value;
-    setSingleParameterWrite_uint32(index, u32_value);
+    uint32_t id = 0x12 << 24 | can_master_id << 8 | can_id;
+    uint8_t data[8] = {0};
+    data[0] = index & 0xff;
+    data[1] = index >> 8;
+    data[4] = value & 0xff;
+    data[5] = 0;
+    data[6] = 0;
+    data[7] = 0;
+    uint8_t dlc = 8;
+    bool is_remote_frame = false;
+    bool is_ext_id = true;
+    can_driver->tx(id, data, dlc, is_remote_frame, is_ext_id);
   }
 
   void setSingleParameterWrite_uint16(uint16_t index, uint16_t value)
@@ -222,8 +233,15 @@ public:
 
   void setSingleParameterWrite_float(uint16_t index, float value)
   {
-    uint32_t u32_value = *(uint32_t *)(&value);
-    setSingleParameterWrite_uint32(index, u32_value);
+    uint32_t id = 0x12 << 24 | can_master_id << 8 | can_id;
+    uint8_t data[8] = {0};
+    data[0] = index & 0xff;
+    data[1] = index >> 8;
+    memcpy(&data[4], &value, 4);
+    uint8_t dlc = 8;
+    bool is_remote_frame = false;
+    bool is_ext_id = true;
+    can_driver->tx(id, data, dlc, is_remote_frame, is_ext_id);
   }
 
   uint32_t getSingleParameterRead_uint32(uint8_t * data)
@@ -248,8 +266,9 @@ public:
     return *(float *)(&u32_value);
   }
 
-  void receiveMotorFeedbackData(uint8_t * data)
+  void receiveMotorFeedbackData(uint32_t id, uint8_t * data)
   {
+    motor_mode_status = (id >> 22) & 0x3;
     angle = uint16_to_float((data[0] << 8) | data[1], RS05::P_MIN, RS05::P_MAX, 16);
     speed = uint16_to_float((data[2] << 8) | data[3], RS05::V_MIN, RS05::V_MAX, 16);
     torque = uint16_to_float((data[4] << 8) | data[5], RS05::T_MIN, RS05::T_MAX, 16);
@@ -262,8 +281,18 @@ public:
     if (is_remote_frame == true) return false;  // リモートフレームは無視する
     if (is_ext_id == false) return false;       // 拡張IDでないメッセージは無視する
 
-    if ((id & 0xFF000000) >> 24 == 0x2 && (id & 0x000000FF) != can_master_id) {
-      receiveMotorFeedbackData(data);
+    // type 2のデータを受信した場合
+    if (
+      ((id & 0xFF000000) >> 24 == 0x2) && ((id & 0xFF00) >> 8 == can_id) &&
+      (id & 0x000000FF) == can_master_id) {
+      receiveMotorFeedbackData(id, data);
+      return true;
+    }
+    // type 24のデータを受信した場合
+    if (
+      ((id & 0xFF000000) >> 24 == 0x18) && ((id & 0xFF00) >> 8 == can_id) &&
+      (id & 0x000000FF) == can_master_id) {
+      receiveMotorFeedbackData(id, data);
       return true;
     }
 

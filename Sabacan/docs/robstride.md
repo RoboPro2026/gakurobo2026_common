@@ -71,7 +71,7 @@ float32 csp_angle_ref
 
 例: MIT 指令（board_id=127）
 ```bash
-ros2 topic pub -r 100 /sabacan_robstride_ref127 sabacan_msgs/msg/SabacanRobstrideRef "{
+ros2 topic pub --once /sabacan_robstride_ref127 sabacan_msgs/msg/SabacanRobstrideRef "{
   control_type: 'MIT',
   mit_torque: 0.2,
   mit_pos: 0.0,
@@ -81,9 +81,17 @@ ros2 topic pub -r 100 /sabacan_robstride_ref127 sabacan_msgs/msg/SabacanRobstrid
 }"
 ```
 
+例: 電流指令（board_id=127）
+```bash
+ros2 topic pub --once /sabacan_robstride_ref127 sabacan_msgs/msg/SabacanRobstrideRef "{
+  control_type: 'CURRENT',
+  current_ref: 1.0
+}"
+```
+
 例: 速度指令（board_id=127）
 ```bash
-ros2 topic pub -r 100 /sabacan_robstride_ref127 sabacan_msgs/msg/SabacanRobstrideRef "{
+ros2 topic pub --once /sabacan_robstride_ref127 sabacan_msgs/msg/SabacanRobstrideRef "{
   control_type: 'VELOCITY',
   velocity_ref: 5.0
 }"
@@ -91,9 +99,17 @@ ros2 topic pub -r 100 /sabacan_robstride_ref127 sabacan_msgs/msg/SabacanRobstrid
 
 例: PP 位置指令（board_id=127）
 ```bash
-ros2 topic pub -r 100 /sabacan_robstride_ref127 sabacan_msgs/msg/SabacanRobstrideRef "{
+ros2 topic pub --once /sabacan_robstride_ref127 sabacan_msgs/msg/SabacanRobstrideRef "{
   control_type: 'PP',
   pp_angle_ref: 1.57
+}"
+```
+
+例: CSP 位置指令（board_id=127）
+```bash
+ros2 topic pub --once /sabacan_robstride_ref127 sabacan_msgs/msg/SabacanRobstrideRef "{
+  control_type: 'CSP',
+  csp_angle_ref: 1.57
 }"
 ```
 

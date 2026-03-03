@@ -253,6 +253,9 @@ public:
 
     // 前回とモードが変わっていたときは、モード切り替えの処理をする
     if (msg->control_type != prev_control_type_) {
+      // モードの切り替え前にモータを止める
+      robstride_driver_->setMotorStopsRunning(1);
+      // モードの切り替え
       if (msg->control_type == "MIT") {
         robstride_driver_->setSingleParameterWrite_uint8(RobstrideIndex::RUN_MODE, 0x0);
       } else if (msg->control_type == "PP") {
@@ -264,7 +267,7 @@ public:
       } else if (msg->control_type == "CSP") {
         robstride_driver_->setSingleParameterWrite_uint8(RobstrideIndex::RUN_MODE, 0x5);
       }
-      // 念の為モータをenableにする
+      // モータを動かす
       robstride_driver_->setMotorEnabledToRun();
       RCLCPP_INFO(this->get_logger(), "Control mode changed: %s", msg->control_type.c_str());
     }
@@ -298,13 +301,21 @@ public:
   {
     // モータの状態をpublishする
     sabacan_msgs::msg::SabacanRobstrideStatus status_msg;
+    status_msg.control_type = prev_control_type_;
+    if (robstride_driver_->motor_mode_status == 0) {
+      status_msg.motor_mode_status = "RESET";
+    } else if (robstride_driver_->motor_mode_status == 1) {
+      status_msg.motor_mode_status = "CALIBURATION";
+    } else {
+      status_msg.motor_mode_status = "RUN";
+    }
     status_msg.torque = robstride_driver_->torque;
     status_msg.speed = robstride_driver_->speed;
     status_msg.pos = integrated_current_angle_;
     sabacan_status_publisher_->publish(status_msg);
-    // RCLCPP_INFO(
-    //   this->get_logger(), "Publishing status: torque=%f, speed=%f, pos=%f", status_msg.torque,
-    //   status_msg.speed, status_msg.pos);
+    RCLCPP_INFO(
+      this->get_logger(), "Publishing status: torque=%f, speed=%f, pos=%f", status_msg.torque,
+      status_msg.speed, status_msg.pos);
   }
 
   // パラメータ変更コールバック
@@ -373,19 +384,19 @@ public:
     raw_prev_angle_ = 0;
     integrated_current_angle_ = 0.0f;
     turn_cnt_ = 0;
+    rclcpp::Time start_time = this->get_clock()->now();
     // 安全のためモータを停止
     robstride_driver_->setMotorStopsRunning(1);
     delay();
-    rclcpp::Time start_time = this->get_clock()->now();
+    // モータをスタート
+    robstride_driver_->setMotorEnabledToRun();
+    delay();
     for (size_t i = 0; i < param_name.size(); i++) {
       // update_parameters関数内ではdelayが入っている。
       update_parameters(this->get_parameter(param_name[i]));
     }
     // フィードバックを有効
     robstride_driver_->setMotorActivelyReportsFrames(true);
-    delay();
-    // モータをスタート
-    robstride_driver_->setMotorEnabledToRun();
     delay();
 
     rclcpp::Time end_time = this->get_clock()->now();
