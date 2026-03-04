@@ -11,7 +11,9 @@
 
 #include <arpa/inet.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <net/if.h>
+#include <poll.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -73,7 +75,11 @@ public:
       const ssize_t r = recv(fd, p + got, remaining, 0);
       if (r == 0) return false;  // peer closed
       if (r < 0) {
-        if (errno == EINTR) continue;
+        if (errno == EINTR) {
+          if (!running_.load() || !rclcpp::ok()) return false;
+          continue;
+        }
+        if (errno == EAGAIN || errno == EWOULDBLOCK) return false;
         return false;
       }
       got += static_cast<size_t>(r);
@@ -98,7 +104,11 @@ public:
       const size_t remaining = n - sent;
       const ssize_t w = send(fd, p + sent, remaining, 0);
       if (w <= 0) {
-        if (w < 0 && errno == EINTR) continue;
+        if (w < 0 && errno == EINTR) {
+          if (!running_.load() || !rclcpp::ok()) return false;
+          continue;
+        }
+        if (w < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) return false;
         return false;
       }
       sent += static_cast<size_t>(w);
@@ -121,6 +131,12 @@ public:
       return -1;
     }
 
+    // Make connect cancellable-ish by using non-blocking connect + poll timeout.
+    const int old_flags = fcntl(s, F_GETFL, 0);
+    if (old_flags >= 0) {
+      (void)fcntl(s, F_SETFL, old_flags | O_NONBLOCK);
+    }
+
     sockaddr_in addr{};
     addr.sin_family = AF_INET;
     addr.sin_port = htons((uint16_t)port);
@@ -130,11 +146,54 @@ public:
       return -1;
     }
 
-    if (connect(s, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) < 0) {
-      close(s);
-      RCLCPP_ERROR(get_logger(), "connect() failed: %s", std::strerror(errno));
-      return -1;
+    const int rc = connect(s, reinterpret_cast<sockaddr *>(&addr), sizeof(addr));
+    if (rc < 0) {
+      if (errno != EINPROGRESS) {
+        close(s);
+        RCLCPP_ERROR(get_logger(), "connect() failed: %s", std::strerror(errno));
+        return -1;
+      }
+
+      pollfd pfd{};
+      pfd.fd = s;
+      pfd.events = POLLOUT;
+      const int prc = poll(&pfd, 1, 1000);
+      if (prc <= 0) {
+        close(s);
+        if (prc == 0) {
+          RCLCPP_ERROR(get_logger(), "connect() timeout to %s:%d", ip.c_str(), port);
+        } else {
+          RCLCPP_ERROR(get_logger(), "poll() failed during connect: %s", std::strerror(errno));
+        }
+        return -1;
+      }
+
+      int so_error = 0;
+      socklen_t so_error_len = sizeof(so_error);
+      if (getsockopt(s, SOL_SOCKET, SO_ERROR, &so_error, &so_error_len) != 0) {
+        close(s);
+        RCLCPP_ERROR(get_logger(), "getsockopt(SO_ERROR) failed: %s", std::strerror(errno));
+        return -1;
+      }
+      if (so_error != 0) {
+        close(s);
+        RCLCPP_ERROR(get_logger(), "connect() failed: %s", std::strerror(so_error));
+        return -1;
+      }
     }
+
+    // Restore blocking mode (best effort).
+    if (old_flags >= 0) {
+      (void)fcntl(s, F_SETFL, old_flags);
+    }
+
+    // Set recv/send timeouts so shutdown doesn't hang on blocking syscalls.
+    timeval tv{};
+    tv.tv_sec = 1;
+    tv.tv_usec = 0;
+    (void)setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+    (void)setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+
     return s;
   }
 
@@ -161,6 +220,10 @@ public:
 
     running_.store(true);
     rx_thread_ = std::thread([this]() { this->rx_loop(); });
+
+    RCLCPP_INFO(
+      get_logger(), "eth2can_node started with device IP %s and port %d", device_ip_.c_str(),
+      device_port_);
   }
 
   ~Eth2CanNode() override
@@ -248,7 +311,7 @@ public:
 
   void rx_loop()
   {
-    while (running_.load()) {
+    while (running_.load() && rclcpp::ok()) {
       int fd = -1;
       fd = get_or_connect_tcp();
       if (fd < 0) {
