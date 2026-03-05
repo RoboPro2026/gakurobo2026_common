@@ -57,39 +57,13 @@ class Eth2CanNode : public rclcpp::Node
 {
 public:
   static constexpr size_t CAN_MAX_DLEN = 8;
+  static constexpr size_t GATEWAY_PACKET_SIZE = sizeof(GatewayPacket);
+
+  static_assert(sizeof(CanFrame) == 72, "CanFrame must be 72 bytes");
+  static_assert(sizeof(GatewayPacket) == 76, "GatewayPacket must be 76 bytes");
 
   /**
-   * @brief 全てのデータを受信するまでrecvを繰り返す関数
-   * 
-   * @param fd 
-   * @param buf 
-   * @param n 
-   * @return true 成功
-   * @return false 失敗
-   */
-  bool recv_all(int fd, void * buf, size_t n)
-  {
-    uint8_t * p = (uint8_t *)buf;
-    size_t got = 0;
-    while (got < n) {
-      const size_t remaining = n - got;
-      const ssize_t r = recv(fd, p + got, remaining, 0);
-      if (r == 0) return false;  // peer closed
-      if (r < 0) {
-        if (errno == EINTR) {
-          if (!running_.load() || !rclcpp::ok()) return false;
-          continue;
-        }
-        if (errno == EAGAIN || errno == EWOULDBLOCK) return false;
-        return false;
-      }
-      got += static_cast<size_t>(r);
-    }
-    return true;
-  }
-
-  /**
-   * @brief 全てのデータを送信するまでsendを繰り返す関数
+   * @brief 全てのデータをsendで送る関数
    * 
    * @param fd 
    * @param buf 
@@ -100,19 +74,16 @@ public:
   bool send_all(int fd, void * buf, size_t n)
   {
     uint8_t * p = (uint8_t *)buf;
-    size_t sent = 0;
-    while (sent < n) {
-      const size_t remaining = n - sent;
-      const ssize_t w = send(fd, p + sent, remaining, 0);
-      if (w <= 0) {
-        if (w < 0 && errno == EINTR) {
-          if (!running_.load() || !rclcpp::ok()) return false;
-          continue;
-        }
-        if (w < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) return false;
-        return false;
+
+    // パケットは一括で送る。
+    const ssize_t w = send(fd, p, n, 0);
+    if (w < 0) {
+      if (errno == EINTR) {
+        if (!running_.load() || !rclcpp::ok()) return false;
+        return true;  // consider interrupted send as success, since we don't want to retry
       }
-      sent += static_cast<size_t>(w);
+      if (errno == EAGAIN || errno == EWOULDBLOCK) return false;
+      return false;
     }
     return true;
   }
@@ -322,6 +293,9 @@ public:
 
   void rx_loop()
   {
+    std::vector<uint8_t> rx_buf;
+    rx_buf.reserve(4096);
+
     while (running_.load() && rclcpp::ok()) {
       int fd = -1;
       fd = get_or_connect_tcp();
@@ -330,52 +304,97 @@ public:
         continue;
       }
 
-      GatewayPacket pkt{};
-      if (!recv_all(fd, &pkt, sizeof(pkt))) {
-        // パケットがないときもでるので、INFOにする
-        RCLCPP_WARN(get_logger(), "TCP recv failed, closing connection");
+      pollfd pfd{};
+      pfd.fd = fd;
+      pfd.events = POLLIN;
+
+      const int prc = poll(&pfd, 1, 100);
+      if (prc < 0) {
+        if (errno == EINTR) continue;
+        RCLCPP_WARN(
+          get_logger(), "poll() failed in rx_loop, closing connection: %s", std::strerror(errno));
         close_tcp();
-        ::sleep(1);
+        continue;
+      }
+      if (prc == 0) {
+        continue;  // timeout
+      }
+
+      if ((pfd.revents & (POLLERR | POLLHUP | POLLNVAL)) != 0) {
+        RCLCPP_WARN(get_logger(), "TCP socket error/hup in rx_loop, closing connection");
+        close_tcp();
+        continue;
+      }
+      if ((pfd.revents & POLLIN) == 0) {
         continue;
       }
 
-      // Convert GatewayPacket -> can_msgs/Frame
-      const uint32_t can_id_host = pkt.frame.can_id;
-      const bool is_extended = (can_id_host & CAN_EFF_FLAG) != 0;
-      const bool is_rtr = (can_id_host & CAN_RTR_FLAG) != 0;
-
-      can_msgs::msg::Frame msg;
-      msg.header.stamp = now();
-      msg.id = is_extended ? (can_id_host & CAN_EFF_MASK) : (can_id_host & CAN_SFF_MASK);
-      msg.is_extended = is_extended;
-      msg.is_rtr = is_rtr;
-      msg.is_error = (can_id_host & CAN_ERR_FLAG) != 0;
-      // can_msgsはcan_fdには対応していないので、データ長は最大8バイトとして扱う
-      msg.dlc =
-        (pkt.frame.len <= CAN_MAX_DLEN) ? pkt.frame.len : static_cast<uint8_t>(CAN_MAX_DLEN);
-
-      // 一度すべてのデータを0にする
-      for (size_t i = 0; i < msg.data.size(); i++) {
-        msg.data[i] = 0;
-      }
-      // データをコピー
-      for (size_t i = 0; i < msg.dlc; i++) {
-        msg.data[i] = pkt.frame.data[i];
-      }
-
-      // publish
-      int channel = pkt.channel;
-      if (channel < 0 || channel >= N) {
-        RCLCPP_ERROR(get_logger(), "Received packet with invalid channel %d", channel);
+      uint8_t tmp[4096];
+      const ssize_t r = recv(fd, tmp, sizeof(tmp), 0);
+      if (r == 0) {
+        RCLCPP_WARN(get_logger(), "TCP peer closed, closing connection");
+        close_tcp();
         continue;
       }
-      from_can_bus_publisher_[channel]->publish(msg);
+      if (r < 0) {
+        if (errno == EINTR) continue;
+        if (errno == EAGAIN || errno == EWOULDBLOCK) continue;
+        RCLCPP_WARN(get_logger(), "TCP recv error, closing connection: %s", std::strerror(errno));
+        close_tcp();
+        continue;
+      }
 
-      RCLCPP_INFO(
-        this->get_logger(),
-        "Received CAN frame: ID=0x%X, DLC=%d, Data=[%02X %02X %02X %02X %02X %02X %02X %02X]",
-        msg.id, msg.dlc, msg.data[0], msg.data[1], msg.data[2], msg.data[3], msg.data[4],
-        msg.data[5], msg.data[6], msg.data[7]);
+      rx_buf.insert(rx_buf.end(), tmp, tmp + r);
+
+      // TCP can split/coalesce packets; parse from a buffer like the Python version.
+      size_t offset = 0;
+      while (rx_buf.size() - offset >= GATEWAY_PACKET_SIZE) {
+        GatewayPacket pkt{};
+        std::memcpy(&pkt, rx_buf.data() + offset, GATEWAY_PACKET_SIZE);
+        offset += GATEWAY_PACKET_SIZE;
+
+        // Convert GatewayPacket -> can_msgs/Frame
+        const uint32_t can_id_host = pkt.frame.can_id;
+        const bool is_extended = (can_id_host & CAN_EFF_FLAG) != 0;
+        const bool is_rtr = (can_id_host & CAN_RTR_FLAG) != 0;
+
+        can_msgs::msg::Frame msg;
+        msg.header.stamp = now();
+        msg.id = is_extended ? (can_id_host & CAN_EFF_MASK) : (can_id_host & CAN_SFF_MASK);
+        msg.is_extended = is_extended;
+        msg.is_rtr = is_rtr;
+        msg.is_error = (can_id_host & CAN_ERR_FLAG) != 0;
+        // can_msgsはcan_fdには対応していないので、データ長は最大8バイトとして扱う
+        msg.dlc =
+          (pkt.frame.len <= CAN_MAX_DLEN) ? pkt.frame.len : static_cast<uint8_t>(CAN_MAX_DLEN);
+
+        // 一度すべてのデータを0にする
+        for (size_t i = 0; i < msg.data.size(); i++) {
+          msg.data[i] = 0;
+        }
+        // データをコピー
+        for (size_t i = 0; i < msg.dlc; i++) {
+          msg.data[i] = pkt.frame.data[i];
+        }
+
+        // publish
+        const int channel = pkt.channel;
+        if (channel < 0 || channel >= N) {
+          RCLCPP_ERROR(get_logger(), "Received packet with invalid channel %d", channel);
+          continue;
+        }
+        from_can_bus_publisher_[channel]->publish(msg);
+
+        RCLCPP_INFO(
+          this->get_logger(),
+          "Received CAN frame: ID=0x%X, DLC=%d, Data=[%02X %02X %02X %02X %02X %02X %02X %02X]",
+          msg.id, msg.dlc, msg.data[0], msg.data[1], msg.data[2], msg.data[3], msg.data[4],
+          msg.data[5], msg.data[6], msg.data[7]);
+      }
+
+      if (offset > 0) {
+        rx_buf.erase(rx_buf.begin(), rx_buf.begin() + static_cast<std::ptrdiff_t>(offset));
+      }
     }
   }
 

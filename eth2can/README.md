@@ -23,6 +23,7 @@ TCP(Ethernet) 接続された CAN ゲートウェイと ROS 2 の `can_msgs/msg/
 **Parameters**
 - `device_ip` (string, default: `192.168.1.100`)
 - `device_port` (int, default: `5000`)
+- `tcp_nodelay` (bool, default: `true`) - 小さいパケットの遅延を減らすため `TCP_NODELAY` を有効化
 
 > 注: `can_msgs/msg/Frame` の `data` は 8 byte（通常 CAN）です。`dlc` も 0..8 を前提に扱います。
 
