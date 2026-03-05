@@ -13,6 +13,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <net/if.h>
+#include <netinet/tcp.h>
 #include <poll.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
@@ -194,6 +195,13 @@ public:
     (void)setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
     (void)setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
 
+    if (tcp_nodelay_) {
+      int one = 1;
+      if (setsockopt(s, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one)) != 0) {
+        RCLCPP_WARN(get_logger(), "setsockopt(TCP_NODELAY) failed: %s", std::strerror(errno));
+      }
+    }
+
     return s;
   }
 
@@ -201,9 +209,11 @@ public:
   {
     this->declare_parameter("device_ip", "192.168.1.100");
     this->declare_parameter("device_port", 5000);
+    this->declare_parameter("tcp_nodelay", true);
 
     this->get_parameter("device_ip", device_ip_);
     this->get_parameter("device_port", device_port_);
+    this->get_parameter("tcp_nodelay", tcp_nodelay_);
 
     // vectorをresize、CANの数は3つ
     from_can_bus_publisher_.resize(N);
@@ -384,6 +394,7 @@ public:
 
   std::string device_ip_;
   int device_port_;
+  bool tcp_nodelay_{true};
 
   std::mutex tcp_mtx_;
   int tcp_fd_{-1};
