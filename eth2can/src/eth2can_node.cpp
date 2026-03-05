@@ -213,7 +213,8 @@ public:
       from_can_bus_publisher_[i] =
         this->create_publisher<can_msgs::msg::Frame>("from_can_bus" + std::to_string(i), 100);
       to_can_bus_subscription_[i] = this->create_subscription<can_msgs::msg::Frame>(
-        "to_can_bus" + std::to_string(i), 10, [this, i](const can_msgs::msg::Frame::SharedPtr msg) {
+        "to_can_bus" + std::to_string(i), 100,
+        [this, i](const can_msgs::msg::Frame::SharedPtr msg) {
           this->to_can_bus_callback(msg, i);
         });
     }
@@ -321,7 +322,8 @@ public:
 
       GatewayPacket pkt{};
       if (!recv_all(fd, &pkt, sizeof(pkt))) {
-        RCLCPP_ERROR(get_logger(), "TCP recv failed, closing connection");
+        // パケットがないときもでるので、INFOにする
+        RCLCPP_WARN(get_logger(), "TCP recv failed, closing connection");
         close_tcp();
         ::sleep(1);
         continue;
