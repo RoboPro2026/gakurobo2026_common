@@ -39,11 +39,9 @@ using namespace std::chrono_literals;
 struct CanFrame
 {
   uint32_t can_id;  // SocketCAN compatible flags inside
-  uint8_t len;      // 0..64
-  uint8_t flags;    // device-specific (optional)
-  uint8_t rsv0;
-  uint8_t rsv1;
-  uint8_t data[64];
+  uint8_t len;      // 0..8
+  uint8_t reserved[3];
+  uint8_t data[8];
 } __attribute__((packed));
 
 struct GatewayPacket
@@ -59,8 +57,8 @@ public:
   static constexpr size_t CAN_MAX_DLEN = 8;
   static constexpr size_t GATEWAY_PACKET_SIZE = sizeof(GatewayPacket);
 
-  static_assert(sizeof(CanFrame) == 72, "CanFrame must be 72 bytes");
-  static_assert(sizeof(GatewayPacket) == 76, "GatewayPacket must be 76 bytes");
+  static_assert(sizeof(CanFrame) == 16, "CanFrame must be 16 bytes");
+  static_assert(sizeof(GatewayPacket) == 20, "GatewayPacket must be 20 bytes");
 
   /**
    * @brief 全てのデータをsendで送る関数
@@ -259,12 +257,9 @@ public:
     pkt.frame.can_id = can_id;
     pkt.frame.len = (msg->dlc <= CAN_MAX_DLEN) ? static_cast<uint8_t>(msg->dlc)
                                                : static_cast<uint8_t>(CAN_MAX_DLEN);
-    pkt.frame.flags = 0;
-    pkt.frame.rsv0 = 0;
-    pkt.frame.rsv1 = 0;
 
     // データを0で初期化
-    for (int i = 0; i < 64; i++) {
+    for (int i = 0; i < 8; i++) {
       pkt.frame.data[i] = 0;
     }
     // データをコピー
