@@ -4,10 +4,8 @@
  * @brief Ethernet to CANのノード
  * @version 0.1
  * @date 2026-03-04
- * 
- * @copyright Copyright (c) 2026
- * 
- */
+ * * @copyright Copyright (c) 2026
+ * */
 
 #include <arpa/inet.h>
 #include <errno.h>
@@ -62,8 +60,7 @@ public:
 
   /**
    * @brief 全てのデータをsendで送る関数
-   * 
-   * @param fd 
+   * * @param fd 
    * @param buf 
    * @param n 
    * @return true 成功
@@ -88,8 +85,7 @@ public:
 
   /**
    * @brief TCP接続を確立する関数
-   * 
-   * @param ip IPアドレスの文字列
+   * * @param ip IPアドレスの文字列
    * @param port ポート番号
    * @return int 
    */
@@ -190,9 +186,9 @@ public:
     // CANの数だけPublisherとSubscriptionを作成
     for (int i = 0; i < N; i++) {
       from_can_bus_publisher_[i] =
-        this->create_publisher<can_msgs::msg::Frame>("from_can_bus" + std::to_string(i), 100);
+        this->create_publisher<can_msgs::msg::Frame>("from_can_bus" + std::to_string(i), 500);
       to_can_bus_subscription_[i] = this->create_subscription<can_msgs::msg::Frame>(
-        "to_can_bus" + std::to_string(i), 100,
+        "to_can_bus" + std::to_string(i), 500,
         [this, i](const can_msgs::msg::Frame::SharedPtr msg) {
           this->to_can_bus_callback(msg, i);
         });
@@ -278,25 +274,22 @@ public:
       RCLCPP_ERROR(get_logger(), "TCP send failed, closing connection");
       close_tcp();
     }
-
-    RCLCPP_INFO(
-      this->get_logger(),
-      "Sent CAN frame: ID=0x%X, DLC=%d, Data=[%02X %02X %02X %02X %02X %02X %02X %02X]", msg->id,
-      msg->dlc, msg->data[0], msg->data[1], msg->data[2], msg->data[3], msg->data[4], msg->data[5],
-      msg->data[6], msg->data[7]);
   }
 
   void rx_loop()
   {
     std::vector<uint8_t> rx_buf;
-    rx_buf.reserve(4096);
+    rx_buf.reserve(8192);  // バッファの予約サイズを拡大
+
+    int fd = -1;  // ループの外でfdを管理し、ロック競合を回避
 
     while (running_.load() && rclcpp::ok()) {
-      int fd = -1;
-      fd = get_or_connect_tcp();
       if (fd < 0) {
-        ::sleep(1);
-        continue;
+        fd = get_or_connect_tcp();
+        if (fd < 0) {
+          std::this_thread::sleep_for(1s);
+          continue;
+        }
       }
 
       pollfd pfd{};
@@ -309,6 +302,7 @@ public:
         RCLCPP_WARN(
           get_logger(), "poll() failed in rx_loop, closing connection: %s", std::strerror(errno));
         close_tcp();
+        fd = -1;  // エラー時はfdをリセット
         continue;
       }
       if (prc == 0) {
@@ -318,17 +312,19 @@ public:
       if ((pfd.revents & (POLLERR | POLLHUP | POLLNVAL)) != 0) {
         RCLCPP_WARN(get_logger(), "TCP socket error/hup in rx_loop, closing connection");
         close_tcp();
+        fd = -1;  // エラー時はfdをリセット
         continue;
       }
       if ((pfd.revents & POLLIN) == 0) {
         continue;
       }
 
-      uint8_t tmp[4096];
+      uint8_t tmp[4096];  // 一度に読み込むサイズを拡大してシステムコールを減らす
       const ssize_t r = recv(fd, tmp, sizeof(tmp), 0);
       if (r == 0) {
         RCLCPP_WARN(get_logger(), "TCP peer closed, closing connection");
         close_tcp();
+        fd = -1;  // エラー時はfdをリセット
         continue;
       }
       if (r < 0) {
@@ -336,6 +332,7 @@ public:
         if (errno == EAGAIN || errno == EWOULDBLOCK) continue;
         RCLCPP_WARN(get_logger(), "TCP recv error, closing connection: %s", std::strerror(errno));
         close_tcp();
+        fd = -1;  // エラー時はfdをリセット
         continue;
       }
 
@@ -379,12 +376,6 @@ public:
           continue;
         }
         from_can_bus_publisher_[channel]->publish(msg);
-
-        RCLCPP_INFO(
-          this->get_logger(),
-          "Received CAN frame: ID=0x%X, DLC=%d, Data=[%02X %02X %02X %02X %02X %02X %02X %02X]",
-          msg.id, msg.dlc, msg.data[0], msg.data[1], msg.data[2], msg.data[3], msg.data[4],
-          msg.data[5], msg.data[6], msg.data[7]);
       }
 
       if (offset > 0) {
