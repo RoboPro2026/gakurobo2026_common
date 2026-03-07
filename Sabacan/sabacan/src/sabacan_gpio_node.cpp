@@ -20,7 +20,7 @@ class SabacanGPIONode : public rclcpp::Node
 {
 public:
   SabacanGPIONode(const rclcpp::NodeOptions & options = rclcpp::NodeOptions())
-  : Node("sabacan_gpio_node")
+  : Node("sabacan_gpio_node", options)
   {
     // board_idを必須パラメータとして宣言（デフォルト値なし）
     // パラメータの制約や説明を記述子で定義
