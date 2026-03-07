@@ -66,6 +66,8 @@ public:
 
     this->declare_parameter("enable_initialize", true);
     this->get_parameter("enable_initialize", enable_initialize_);
+    this->declare_parameter("publish_timer_rate", 100.0);
+    this->get_parameter("publish_timer_rate", publish_timer_rate_);
 
     // robstride_typeの文字列をチェック
     this->declare_parameter("robstride_type", "RS05");
@@ -130,9 +132,10 @@ public:
     parameter_callback_handle_ = this->add_on_set_parameters_callback(
       std::bind(&SabacanRobstrideNode::parameter_callback, this, std::placeholders::_1));
 
-    // 100Hzでpublish用のtimerを呼ぶ
     publish_timer_ =
-      this->create_wall_timer(10ms, std::bind(&SabacanRobstrideNode::publish_timer_callback, this));
+      this->create_wall_timer(
+        std::chrono::duration<double>(1.0 / publish_timer_rate_),
+        std::bind(&SabacanRobstrideNode::publish_timer_callback, this));
 
     // 初期化命令を送信
     if (enable_initialize_) {
@@ -460,6 +463,7 @@ public:
   std::string robstride_type_str_;
   RobstrideType robstride_type_;
   bool enable_initialize_;
+  double publish_timer_rate_;
   // velocity modeのパラメータ
   float velocity_mode_limit_cur_;
   float velocity_mode_acc_rad_;

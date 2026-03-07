@@ -34,6 +34,8 @@ public:
 
     this->declare_parameter("enable_initialize", true);
     this->get_parameter("enable_initialize", enable_initialize_);
+    this->declare_parameter("publish_timer_rate", 100.0);
+    this->get_parameter("publish_timer_rate", publish_timer_rate_);
 
     // 必須パラメータ'board_id'が設定されているかチェック
     try {
@@ -97,8 +99,9 @@ public:
         this->tx(id, data, dlc, is_remote, is_ext);
       });
 
-    // 100Hzのタイマーを設定
-    timer_ = this->create_wall_timer(10ms, std::bind(&SabacanPowerNode::timer_callback, this));
+    timer_ = this->create_wall_timer(
+      std::chrono::duration<double>(1.0 / publish_timer_rate_),
+      std::bind(&SabacanPowerNode::timer_callback, this));
 
     if (enable_initialize_) {
       power_init();
@@ -351,6 +354,7 @@ private:
 
   int64_t board_id_;
   bool enable_initialize_;
+  double publish_timer_rate_;
   int cell_n_;
   int ex_ems_trg_;
   bool common_ems_en_;
