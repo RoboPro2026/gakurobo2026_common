@@ -292,6 +292,7 @@ public:
     // Single Parameter Readの受信処理のみ行う
     if (is_remote_frame == true) return false;  // リモートフレームは無視する
     if (is_ext_id == false) return false;       // 拡張IDでないメッセージは無視する
+    if (dlc < 8) return false;                  // 8byte未満のデータは無視する
 
     // type 2のデータを受信した場合
     if (

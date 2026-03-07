@@ -37,6 +37,8 @@ public:
 
     this->declare_parameter("enable_initialize", true);
     this->get_parameter("enable_initialize", enable_initialize_);
+    this->declare_parameter("publish_timer_rate", 100.0);
+    this->get_parameter("publish_timer_rate", publish_timer_rate_);
 
     this->declare_parameter("motor_type", std::vector<std::string>{"C610", "C610", "C610", "C610"});
     this->declare_parameter(
@@ -152,9 +154,10 @@ public:
     parameter_callback_handle_ = this->add_on_set_parameters_callback(
       std::bind(&SabacanRobomasV2Node::parameter_callback, this, std::placeholders::_1));
 
-    // 100Hzでpublish用のtimerを呼ぶ
     publish_timer_ =
-      this->create_wall_timer(10ms, std::bind(&SabacanRobomasV2Node::publish_timer_callback, this));
+      this->create_wall_timer(
+        std::chrono::duration<double>(1.0 / publish_timer_rate_),
+        std::bind(&SabacanRobomasV2Node::publish_timer_callback, this));
 
     // 初期化命令を送信
     if (enable_initialize_) {
@@ -845,6 +848,7 @@ private:
   // 各種データの配列
   int64_t board_id_;
   bool enable_initialize_;
+  double publish_timer_rate_;
   // パラメータ、サービスで使用する変数
   std::vector<int64_t> motor_type_ = std::vector<int64_t>(N);
   std::vector<int64_t> control_type_ = std::vector<int64_t>(N);

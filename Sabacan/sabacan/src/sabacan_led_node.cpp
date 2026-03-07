@@ -19,7 +19,7 @@ class SabacanLEDNode : public rclcpp::Node
 {
 public:
   SabacanLEDNode(const rclcpp::NodeOptions & options = rclcpp::NodeOptions())
-  : Node("sabacan_led_node")
+  : Node("sabacan_led_node", options)
   {
     // board_idを必須パラメータとして宣言（デフォルト値なし）
     // パラメータの制約や説明を記述子で定義

@@ -29,6 +29,7 @@ ros2 run sabacan sabacan_robstride_node --ros-args -p board_id:=127
 - `can_master_id` (int64, デフォルト: `253`): マスター側の CAN ID。
 - `robstride_type` (string, デフォルト: `"RS05"`): `"RS05"` / `"EL05"`。
 - `enable_initialize` (bool, デフォルト: `true`): 起動時に初期化コマンド（パラメータ書き込み等）を送るか。
+- `publish_timer_rate` (double, デフォルト: `100.0`): `/sabacan_robstride_status<board_id>` を周期送信するレート [Hz]。
 
 制御パラメータ（ノードが Robstride に書き込みます）:
 - `velocity_mode_limit_cur` (float, デフォルト: `11.0`): 速度モードの電流制限（`LIMIT_CUR`）。
