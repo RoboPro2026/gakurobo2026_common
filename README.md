@@ -6,7 +6,7 @@ SabacanなどのR1とR2で共通で使うプログラムを管理するリポジ
 ## clone方法
 ```
 cd ~/ros2_ws/src
-git clone --recurse-submodules https://github.com/RoboPro2026/gakurobo2026_common.git
+git clone --recurse-submodules git@github.com:RoboPro2026/gakurobo2026_common.git
 ```
 
 ## submoduleの更新方法
