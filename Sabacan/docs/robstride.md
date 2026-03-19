@@ -197,3 +197,6 @@ ros2 service call /sabacan_robstride_reset sabacan_msgs/srv/SabacanReset "{}"
 
 ### 2. CPU が重い / 遅い
 - 本ノードは送受信・publish ごとに `INFO` ログを出します。`--ros-args --log-level warn` を付けて起動してください。
+
+# その他解説資料
+https://nagaokaroboconproject.esa.io/posts/338
