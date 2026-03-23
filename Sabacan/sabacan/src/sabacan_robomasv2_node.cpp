@@ -154,10 +154,9 @@ public:
     parameter_callback_handle_ = this->add_on_set_parameters_callback(
       std::bind(&SabacanRobomasV2Node::parameter_callback, this, std::placeholders::_1));
 
-    publish_timer_ =
-      this->create_wall_timer(
-        std::chrono::duration<double>(1.0 / publish_timer_rate_),
-        std::bind(&SabacanRobomasV2Node::publish_timer_callback, this));
+    publish_timer_ = this->create_wall_timer(
+      std::chrono::duration<double>(1.0 / publish_timer_rate_),
+      std::bind(&SabacanRobomasV2Node::publish_timer_callback, this));
 
     // 初期化命令を送信
     if (enable_initialize_) {
@@ -677,7 +676,7 @@ private:
       }
     } else if (name == "abs_gear_ratio") {
       auto tmp_param = parameter.as_double_array();
-      if ((ret = check_data_range_and_size(tmp_param, 0.0, inf, N, name))) {
+      if ((ret = check_data_range_and_size(tmp_param, -inf, inf, N, name))) {
         for (int i = 0; i < N; i++) {
           robomas_driver_->setAbsGearRatio(i, abs_gear_ratio_[i] = tmp_param[i]);
           delay();
