@@ -335,12 +335,13 @@ private:
     // 初期化用パラメータ
     // clang-format off
     std::vector<std::string> param_name{
+      // abs_gear_ratioを後から設定するとうまく動かないので、最初に設定する。
+      "abs_gear_ratio",
       "motor_type",
       "control_type",
       "dob_en",
       "abs_enc_en",
       "md_guess_en",
-      "abs_gear_ratio",
       "load_j",
       "load_d",
       "dob_cf",

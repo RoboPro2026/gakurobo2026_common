@@ -62,6 +62,7 @@ ros2 run sabacan sabacan_robomasv2_node --ros-args -p board_id:=0 \
       * **初期値**: `[1.0, 1.0, 1.0, 1.0]`。
       * モーターの出力軸からアブソに至るまでの減速比　回転方向が反転するなら負の値を入力
       * ロボマス内臓のエンコーダーを使うときは関係ないので注意
+      * モータの回転方向と`abs_gear_ratio`の回転方向が逆だと、制御が発散する。その時は`abs_gear_ratio`の符号を反転させればよい。
   * `load_j` (double配列): DOBのイナーシャパラメータ [$kg \cdot m^2$]。
       * **初期値**: `[0.0005, 0.0005, 0.0005, 0.0005]`。
   * `load_d` (double配列): DOBの粘性摩擦パラメータ [$N \cdot m \cdot s/rad$]。
