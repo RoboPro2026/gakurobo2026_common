@@ -183,11 +183,20 @@ ros2 topic pub --once /sabacan_robstride_ref127 sabacan_msgs/msg/SabacanRobstrid
 
 メッセージ定義:
 ```text
-string control_type # 制御方式
-string motor_mode_status # 現在のmode、RESET, CALIBURATION,RUNの3つ
+string control_type
 float32 torque # Nm
-float32 speed  # rad/s
-float32 pos    # rad
+float32 speed # rad/s
+float32 pos # rad
+float32 temperature # ℃
+# モータのステータス
+string motor_mode_status
+# モータの故障情報
+bool uncalibrated
+bool gridlock_overload_fault
+bool magnetic_coding_fault
+bool overtemperature
+bool three_phase_overcurrent_fault
+bool undervoltage_fault
 ```
 
 例（board_id=127）:

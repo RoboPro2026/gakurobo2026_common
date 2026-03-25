@@ -20,6 +20,12 @@ public:
   uint8_t can_id = 0;
   uint8_t can_master_id = 0;
   uint8_t motor_mode_status = 0;
+  bool uncalibrated = false;
+  bool gridlock_overload_fault = false;
+  bool magnetic_coding_fault = false;
+  bool overtemperature = false;
+  bool three_phase_overcurrent_fault = false;
+  bool undervoltage_fault = false;
   float torque = 0.0f;
   float speed = 0.0f;
   float angle = 0.0f;
@@ -280,6 +286,12 @@ public:
 
   void receiveMotorFeedbackData(uint32_t id, uint8_t * data)
   {
+    uncalibrated = (id >> 21) & 0x1;
+    gridlock_overload_fault = (id >> 20) & 0x1;
+    magnetic_coding_fault = (id >> 19) & 0x1;
+    overtemperature = (id >> 18) & 0x1;
+    three_phase_overcurrent_fault = (id >> 17) & 0x1;
+    undervoltage_fault = (id >> 16) & 0x1;
     motor_mode_status = (id >> 22) & 0x3;
     if (robstride_type == RobstrideType::RS02) {
       angle = uint16_to_float((data[0] << 8) | data[1], RS02::P_MIN, RS02::P_MAX, 16);

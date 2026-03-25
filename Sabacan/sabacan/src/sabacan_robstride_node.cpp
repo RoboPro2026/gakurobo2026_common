@@ -307,6 +307,11 @@ public:
     // モータの状態をpublishする
     sabacan_msgs::msg::SabacanRobstrideStatus status_msg;
     status_msg.control_type = prev_control_type_;
+    status_msg.torque = robstride_driver_->torque;
+    status_msg.speed = robstride_driver_->speed;
+    status_msg.pos = integrated_current_angle_;
+    status_msg.temperature = robstride_driver_->temperature;
+
     if (robstride_driver_->motor_mode_status == 0) {
       status_msg.motor_mode_status = "RESET";
     } else if (robstride_driver_->motor_mode_status == 1) {
@@ -314,9 +319,14 @@ public:
     } else {
       status_msg.motor_mode_status = "RUN";
     }
-    status_msg.torque = robstride_driver_->torque;
-    status_msg.speed = robstride_driver_->speed;
-    status_msg.pos = integrated_current_angle_;
+
+    status_msg.uncalibrated = robstride_driver_->uncalibrated;
+    status_msg.gridlock_overload_fault = robstride_driver_->gridlock_overload_fault;
+    status_msg.magnetic_coding_fault = robstride_driver_->magnetic_coding_fault;
+    status_msg.overtemperature = robstride_driver_->overtemperature;
+    status_msg.three_phase_overcurrent_fault = robstride_driver_->three_phase_overcurrent_fault;
+    status_msg.undervoltage_fault = robstride_driver_->undervoltage_fault;
+
     sabacan_status_publisher_->publish(status_msg);
     // RCLCPP_INFO(
     //   this->get_logger(), "Publishing status: torque=%f, speed=%f, pos=%f", status_msg.torque,
