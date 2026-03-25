@@ -20,6 +20,12 @@ public:
   uint8_t can_id = 0;
   uint8_t can_master_id = 0;
   uint8_t motor_mode_status = 0;
+  bool uncalibrated = false;
+  bool gridlock_overload_fault = false;
+  bool magnetic_coding_fault = false;
+  bool overtemperature = false;
+  bool three_phase_overcurrent_fault = false;
+  bool undervoltage_fault = false;
   float torque = 0.0f;
   float speed = 0.0f;
   float angle = 0.0f;
@@ -102,7 +108,13 @@ public:
     float torque, float angle, float speed, float kp, float kd)
   {
     uint16_t u16_angle = 0, u16_speed = 0, u16_torque = 0, u16_kp = 0, u16_kd = 0;
-    if (robstride_type == RobstrideType::RS05) {
+    if (robstride_type == RobstrideType::RS02) {
+      u16_torque = float_to_uint(torque, RS02::T_MIN, RS02::T_MAX, 16);
+      u16_angle = float_to_uint(angle, RS02::P_MIN, RS02::P_MAX, 16);
+      u16_speed = float_to_uint(speed, RS02::V_MIN, RS02::V_MAX, 16);
+      u16_kp = float_to_uint(kp, RS02::KP_MIN, RS02::KP_MAX, 16);
+      u16_kd = float_to_uint(kd, RS02::KD_MIN, RS02::KD_MAX, 16);
+    } else if (robstride_type == RobstrideType::RS05) {
       u16_torque = float_to_uint(torque, RS05::T_MIN, RS05::T_MAX, 16);
       u16_angle = float_to_uint(angle, RS05::P_MIN, RS05::P_MAX, 16);
       u16_speed = float_to_uint(speed, RS05::V_MIN, RS05::V_MAX, 16);
@@ -274,8 +286,18 @@ public:
 
   void receiveMotorFeedbackData(uint32_t id, uint8_t * data)
   {
+    uncalibrated = (id >> 21) & 0x1;
+    gridlock_overload_fault = (id >> 20) & 0x1;
+    magnetic_coding_fault = (id >> 19) & 0x1;
+    overtemperature = (id >> 18) & 0x1;
+    three_phase_overcurrent_fault = (id >> 17) & 0x1;
+    undervoltage_fault = (id >> 16) & 0x1;
     motor_mode_status = (id >> 22) & 0x3;
-    if (robstride_type == RobstrideType::RS05) {
+    if (robstride_type == RobstrideType::RS02) {
+      angle = uint16_to_float((data[0] << 8) | data[1], RS02::P_MIN, RS02::P_MAX, 16);
+      speed = uint16_to_float((data[2] << 8) | data[3], RS02::V_MIN, RS02::V_MAX, 16);
+      torque = uint16_to_float((data[4] << 8) | data[5], RS02::T_MIN, RS02::T_MAX, 16);
+    } else if (robstride_type == RobstrideType::RS05) {
       angle = uint16_to_float((data[0] << 8) | data[1], RS05::P_MIN, RS05::P_MAX, 16);
       speed = uint16_to_float((data[2] << 8) | data[3], RS05::V_MIN, RS05::V_MAX, 16);
       torque = uint16_to_float((data[4] << 8) | data[5], RS05::T_MIN, RS05::T_MAX, 16);
@@ -390,6 +412,7 @@ public:
     return true;
   }
 
+  // これ以降は使っていない制御方式だが、念の為残してある
   // ========== MIT Protocol ==========
 
   // void setProtocolSwitching(uint8_t val)
