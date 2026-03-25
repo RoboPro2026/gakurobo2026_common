@@ -27,17 +27,63 @@ ros2 run sabacan sabacan_robstride_node --ros-args -p board_id:=127
 
 - `board_id` (int64, **必須**): Robstride の CAN ID（`0`〜`255`）。
 - `can_master_id` (int64, デフォルト: `253`): マスター側の CAN ID。
-- `robstride_type` (string, デフォルト: `"RS05"`): `"RS05"` / `"EL05"`。
+- `robstride_type` (string, デフォルト: `"RS05"`): `RS02` / `"RS05"` / `"EL05"`。
 - `enable_initialize` (bool, デフォルト: `true`): 起動時に初期化コマンド（パラメータ書き込み等）を送るか。
 - `publish_timer_rate` (double, デフォルト: `100.0`): `/sabacan_robstride_status<board_id>` を周期送信するレート [Hz]。
 
-制御パラメータ（ノードが Robstride に書き込みます）:
+制御パラメータ（ノードが Robstride に書き込みます）:  
+これらの制御パラメータのデフォルト値はRS05のものになっているので、それ以外のモータを使用するときはパラメータ例の値を参考にしてください。必要に応じて、値は調整してください。
 - `velocity_mode_limit_cur` (float, デフォルト: `11.0`): 速度モードの電流制限（`LIMIT_CUR`）。
 - `velocity_mode_acc_rad` (float, デフォルト: `20.0`): 速度モードの加速度（`ACC_RAD`）。
 - `csp_mode_limit_spd` (float, デフォルト: `50.0`): CSP モードの速度制限（`LIMIT_SPD`）。
 - `pp_mode_vel_max` (float, デフォルト: `10.0`): PP モードの最大速度（`VEL_MAX`）。
 - `pp_mode_acc_set` (float, デフォルト: `10.0`): PP モードの加速度（`ACC_SET`）。
 - `espcan_time_ms` (int, デフォルト: `10`): フィードバック周期の設定値（内部で `EPSCAN_TIME` に変換して書き込みます）。
+
+### 2.1 パラメータ例
+パラメータ例はGUIツールやデータシートを元に、山口が適当に決めた値なので、必要に応じて調整して使ってください。  
+RS02  
+```yaml
+sabacan_robstride_node:
+  ros__parameters:
+    board_id: 1 # 使用するID
+    robstride_type: "RS02"
+    # 制御パラメータ
+    velocity_mode_limit_cur: 27.0
+    velocity_mode_acc_rad: 20.0
+    csp_mode_limit_spd: 33.0
+    pp_mode_vel_max: 10.0
+    pp_mode_acc_set: 10.0
+    espcan_time_ms: 10
+```
+RS05
+```yaml
+sabacan_robstride_node:
+  ros__parameters:
+    board_id: 1 # 使用するID
+    robstride_type: "RS05"
+    # 制御パラメータ
+    velocity_mode_limit_cur: 11.0
+    velocity_mode_acc_rad: 20.0
+    csp_mode_limit_spd: 50.0
+    pp_mode_vel_max: 10.0
+    pp_mode_acc_set: 10.0
+    espcan_time_ms: 10
+```
+EL05
+```yaml
+sabacan_robstride_node:
+  ros__parameters:
+    board_id: 1 # 使用するID
+    robstride_type: "EL05"
+    # 制御パラメータ
+    velocity_mode_limit_cur: 11.0
+    velocity_mode_acc_rad: 20.0
+    csp_mode_limit_spd: 50.0
+    pp_mode_vel_max: 10.0
+    pp_mode_acc_set: 10.0
+    espcan_time_ms: 10
+```
 
 ## 3. 指令の送信 (トピック)
 

@@ -72,18 +72,21 @@ public:
     // robstride_typeの文字列をチェック
     this->declare_parameter("robstride_type", "RS05");
     this->get_parameter("robstride_type", robstride_type_str_);
-    if (robstride_type_str_ == "RS05") {
+    if (robstride_type_str_ == "RS02") {
+      robstride_type_ = RobstrideType::RS02;
+    } else if (robstride_type_str_ == "RS05") {
       robstride_type_ = RobstrideType::RS05;
     } else if (robstride_type_str_ == "EL05") {
       robstride_type_ = RobstrideType::EL05;
     } else {
       RCLCPP_FATAL(
-        this->get_logger(), "Invalid robstride_type: %s. Valid options are 'RS05' and 'EL05'.",
+        this->get_logger(),
+        "Invalid robstride_type: %s. Valid options are 'RS02' and 'RS05' and 'EL05'.",
         robstride_type_str_.c_str());
       return;
     }
 
-    // TODO: 初期値はrobstride_type_によって変える
+    // 初期値はRobstride 05の値になっているので、他のモータを使うときはパラメータを変更すること
     this->declare_parameter("velocity_mode_limit_cur", 11.0f);
     this->declare_parameter("velocity_mode_acc_rad", 20.0f);
     this->declare_parameter("csp_mode_limit_spd", 50.0f);
@@ -132,10 +135,9 @@ public:
     parameter_callback_handle_ = this->add_on_set_parameters_callback(
       std::bind(&SabacanRobstrideNode::parameter_callback, this, std::placeholders::_1));
 
-    publish_timer_ =
-      this->create_wall_timer(
-        std::chrono::duration<double>(1.0 / publish_timer_rate_),
-        std::bind(&SabacanRobstrideNode::publish_timer_callback, this));
+    publish_timer_ = this->create_wall_timer(
+      std::chrono::duration<double>(1.0 / publish_timer_rate_),
+      std::bind(&SabacanRobstrideNode::publish_timer_callback, this));
 
     // 初期化命令を送信
     if (enable_initialize_) {

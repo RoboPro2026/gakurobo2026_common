@@ -217,6 +217,20 @@ constexpr uint8_t MODE_NORMAL = 0x00;
 constexpr uint8_t MODE_EMG = 0x01;
 }  // namespace LED
 
+namespace RS02
+{
+constexpr float P_MIN = -12.57f;
+constexpr float P_MAX = 12.57f;
+constexpr float V_MIN = -44.0f;
+constexpr float V_MAX = 44.0f;
+constexpr float KP_MIN = 0.0f;
+constexpr float KP_MAX = 500.0f;
+constexpr float KD_MIN = 0.0f;
+constexpr float KD_MAX = 5.0f;
+constexpr float T_MIN = -17.0f;
+constexpr float T_MAX = 17.0f;
+}  // namespace RS02
+
 namespace RS05
 {
 constexpr float P_MIN = -12.57f;
@@ -247,6 +261,7 @@ constexpr float T_MAX = 6.0f;
 
 enum class RobstrideType
 {
+  RS02,
   RS05,
   EL05,
 };
