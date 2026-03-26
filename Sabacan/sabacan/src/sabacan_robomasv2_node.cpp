@@ -337,6 +337,8 @@ private:
     std::vector<std::string> param_name{
       // abs_gear_ratioを後から設定するとうまく動かないので、最初に設定する。
       "abs_gear_ratio",
+      // abs_turn_cntも安全のため、先に設定しておく。
+      "abs_turn_cnt",
       "motor_type",
       "control_type",
       "dob_en",
@@ -353,7 +355,6 @@ private:
       "pos_gain_i",
       "pos_gain_d",
       "speed_lim",
-      "abs_turn_cnt",
       "vesc_pole",
       "monitor_period",
       "monitor_reg1",
