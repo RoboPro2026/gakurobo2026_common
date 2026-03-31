@@ -34,6 +34,7 @@ public:
 
     this->declare_parameter("enable_initialize", true);
     this->get_parameter("enable_initialize", enable_initialize_);
+    can_configuration_enabled_ = enable_initialize_;
 
     this->declare_parameter<bool>("enable_auto_transition", true);
     this->declare_parameter<int64_t>("emg_blink_period", 0);
@@ -98,10 +99,7 @@ public:
     parameter_callback_handle_ = this->add_on_set_parameters_callback(
       std::bind(&SabacanLEDNode::parameter_callback, this, std::placeholders::_1));
 
-    // 初期化命令を送信
-    if (enable_initialize_) {
-      led_init();
-    }
+    led_init(can_configuration_enabled_);
   }
 
   template <typename T>
@@ -218,7 +216,8 @@ public:
       RCLCPP_INFO(this->get_logger(), "Received reset request for LED node");
 
       // 初期化処理を実行
-      led_init();
+      led_init(true);
+      can_configuration_enabled_ = true;
 
       response->success = true;
       response->message = "LED node reset completed successfully";
@@ -240,7 +239,7 @@ public:
     bool ret = true;
 
     for (const auto & parameter : parameters) {
-      if ((ret = update_parameters(parameter)))
+      if ((ret = update_parameters(parameter, can_configuration_enabled_)))
         RCLCPP_INFO(this->get_logger(), "Updated parameter: %s", parameter.get_name().c_str());
       if (ret == false) {
         result.successful = false;
@@ -250,7 +249,7 @@ public:
     return result;
   }
 
-  void led_init()
+  void led_init(bool send_can)
   {
     std::vector<std::string> param_name{
       "enable_auto_transition", "emg_blink_period", "emg_color",
@@ -261,66 +260,84 @@ public:
 
     for (size_t i = 0; i < param_name.size(); i++) {
       // update_parameters関数内ではdelayが入っている。
-      update_parameters(this->get_parameter(param_name[i]));
+      update_parameters(this->get_parameter(param_name[i]), send_can);
     }
 
     rclcpp::Time end_time = this->get_clock()->now();
-    RCLCPP_INFO(
-      this->get_logger(), "Initialization completed in %.3f seconds",
-      (end_time - start_time).seconds());
+    if (send_can) {
+      RCLCPP_INFO(
+        this->get_logger(), "Initialization completed in %.3f seconds",
+        (end_time - start_time).seconds());
+    } else {
+      RCLCPP_INFO(
+        this->get_logger(), "LED parameters cached without CAN transmission in %.3f seconds",
+        (end_time - start_time).seconds());
+    }
   }
 
   void delay() { std::this_thread::sleep_for(10ms); }
 
-  bool update_parameters(const rclcpp::Parameter & parameter)
+  bool update_parameters(const rclcpp::Parameter & parameter, bool send_can)
   {
     const std::string & name = parameter.get_name();
 
     if (name == "enable_auto_transition") {
       enable_auto_transition_ = parameter.as_bool();
-      led_driver_->setEnableAutoTransition(enable_auto_transition_);
-      delay();
+      if (send_can) {
+        led_driver_->setEnableAutoTransition(enable_auto_transition_);
+        delay();
+      }
     } else if (name == "emg_blink_period") {
       emg_blink_period_ = parameter.as_int();
-      led_driver_->setEmgBlinkPeriod(static_cast<uint16_t>(emg_blink_period_));
-      delay();
+      if (send_can) {
+        led_driver_->setEmgBlinkPeriod(static_cast<uint16_t>(emg_blink_period_));
+        delay();
+      }
     } else if (name == "emg_color") {
       std::vector<int64_t> emg_color = parameter.as_integer_array();
       if (check_data_range_and_size<int64_t>(emg_color, 0, 255, M, "emg_color") == false) {
         return false;
       }
       emg_color_ = emg_color;
-      for (int m = 0; m < M; m++) {
-        led_driver_->setEmgColor(
-          m, (uint8_t)(emg_color_[0]), (uint8_t)(emg_color_[1]), (uint8_t)(emg_color_[2]));
-        delay();
+      if (send_can) {
+        for (int m = 0; m < M; m++) {
+          led_driver_->setEmgColor(
+            m, (uint8_t)(emg_color_[0]), (uint8_t)(emg_color_[1]), (uint8_t)(emg_color_[2]));
+          delay();
+        }
       }
     } else if (name == "monitor_period") {
       monitor_period_ = parameter.as_int();
-      if (enable_monitor_period_) {
+      if (send_can && enable_monitor_period_) {
         led_driver_->setMonitorPeriod(static_cast<uint16_t>(monitor_period_));
         delay();
       }
     } else if (name == "monitor_reg1") {
       monitor_reg1_ = parameter.as_int();
-      led_driver_->setMonitorReg1(static_cast<uint64_t>(monitor_reg1_));
-      delay();
-    } else if (name == "monitor_reg2") {
-      monitor_reg2_ = parameter.as_int();
-      led_driver_->setMonitorReg2(static_cast<uint64_t>(monitor_reg2_));
-      delay();
-    } else if (name == "enable_monitor_period") {
-      enable_monitor_period_ = parameter.as_bool();
-      if (enable_monitor_period_) {
-        led_driver_->setMonitorPeriod(static_cast<uint16_t>(monitor_period_));
-        delay();
+      if (send_can) {
         led_driver_->setMonitorReg1(static_cast<uint64_t>(monitor_reg1_));
         delay();
+      }
+    } else if (name == "monitor_reg2") {
+      monitor_reg2_ = parameter.as_int();
+      if (send_can) {
         led_driver_->setMonitorReg2(static_cast<uint64_t>(monitor_reg2_));
         delay();
-      } else {
-        led_driver_->setMonitorPeriod(0);
-        delay();
+      }
+    } else if (name == "enable_monitor_period") {
+      enable_monitor_period_ = parameter.as_bool();
+      if (send_can) {
+        if (enable_monitor_period_) {
+          led_driver_->setMonitorPeriod(static_cast<uint16_t>(monitor_period_));
+          delay();
+          led_driver_->setMonitorReg1(static_cast<uint64_t>(monitor_reg1_));
+          delay();
+          led_driver_->setMonitorReg2(static_cast<uint64_t>(monitor_reg2_));
+          delay();
+        } else {
+          led_driver_->setMonitorPeriod(0);
+          delay();
+        }
       }
     } else {
       RCLCPP_WARN(this->get_logger(), "Unknown parameter: %s", name.c_str());
@@ -342,6 +359,7 @@ private:
   static constexpr int M = 3;
   int64_t board_id_;
   bool enable_initialize_;
+  bool can_configuration_enabled_{true};
   bool enable_auto_transition_;
   int64_t emg_blink_period_;
   std::vector<int64_t> emg_color_ = std::vector<int64_t>(M, 0);

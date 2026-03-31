@@ -66,6 +66,7 @@ public:
 
     this->declare_parameter("enable_initialize", true);
     this->get_parameter("enable_initialize", enable_initialize_);
+    can_configuration_enabled_ = enable_initialize_;
     this->declare_parameter("publish_timer_rate", 100.0);
     this->get_parameter("publish_timer_rate", publish_timer_rate_);
 
@@ -139,10 +140,7 @@ public:
       std::chrono::duration<double>(1.0 / publish_timer_rate_),
       std::bind(&SabacanRobstrideNode::publish_timer_callback, this));
 
-    // 初期化命令を送信
-    if (enable_initialize_) {
-      robstride_init();
-    }
+    robstride_init(can_configuration_enabled_);
   }
 
   template <typename T>
@@ -342,7 +340,7 @@ public:
     bool ret = true;
 
     for (const auto & parameter : parameters) {
-      if ((ret = update_parameters(parameter)))
+      if ((ret = update_parameters(parameter, can_configuration_enabled_)))
         RCLCPP_INFO(this->get_logger(), "Updated parameter: %s", parameter.get_name().c_str());
       if (ret == false) {
         result.successful = false;
@@ -357,7 +355,8 @@ public:
     std::shared_ptr<sabacan_msgs::srv::SabacanReset::Response> response)
   {
     (void)request;
-    robstride_init();
+    robstride_init(true);
+    can_configuration_enabled_ = true;
     response->success = true;
     RCLCPP_INFO(this->get_logger(), "Sabacan robstride reset successfully.");
   }
@@ -369,8 +368,10 @@ public:
   {
     if (request->set_limit_cur) {
       this->set_parameter(rclcpp::Parameter("velocity_mode_limit_cur", request->limit_cur));
-      robstride_driver_->setSingleParameterWrite_float(
-        RobstrideIndex::LIMIT_CUR, request->limit_cur);
+      if (can_configuration_enabled_) {
+        robstride_driver_->setSingleParameterWrite_float(
+          RobstrideIndex::LIMIT_CUR, request->limit_cur);
+      }
       RCLCPP_INFO(this->get_logger(), "Set limit_cur to %f", request->limit_cur);
     }
     response->success = true;
@@ -379,7 +380,7 @@ public:
 
   void delay() { std::this_thread::sleep_for(10ms); }
 
-  void robstride_init()
+  void robstride_init(bool send_can)
   {
     // clang-format off
     std::vector<std::string> param_name{
@@ -400,57 +401,83 @@ public:
     integrated_current_angle_ = 0.0f;
     turn_cnt_ = 0;
     rclcpp::Time start_time = this->get_clock()->now();
-    // 安全のためモータを停止
-    robstride_driver_->setMotorStopsRunning(1);
-    delay();
-    // モータをスタート
-    robstride_driver_->setMotorEnabledToRun();
-    delay();
+    if (send_can) {
+      // 安全のためモータを停止
+      robstride_driver_->setMotorStopsRunning(1);
+      delay();
+      // モータをスタート
+      robstride_driver_->setMotorEnabledToRun();
+      delay();
+    }
     for (size_t i = 0; i < param_name.size(); i++) {
       // update_parameters関数内ではdelayが入っている。
-      update_parameters(this->get_parameter(param_name[i]));
+      update_parameters(this->get_parameter(param_name[i]), send_can);
     }
-    // フィードバックを有効
-    robstride_driver_->setMotorActivelyReportsFrames(true);
-    delay();
+    if (send_can) {
+      // フィードバックを有効
+      robstride_driver_->setMotorActivelyReportsFrames(true);
+      delay();
+    }
 
     rclcpp::Time end_time = this->get_clock()->now();
-    RCLCPP_INFO(
-      this->get_logger(), "Robstride initialization completed in %.3f seconds",
-      (end_time - start_time).seconds());
+    if (send_can) {
+      RCLCPP_INFO(
+        this->get_logger(), "Robstride initialization completed in %.3f seconds",
+        (end_time - start_time).seconds());
+    } else {
+      RCLCPP_INFO(
+        this->get_logger(),
+        "Robstride parameters cached without CAN transmission in %.3f seconds",
+        (end_time - start_time).seconds());
+    }
   }
 
-  bool update_parameters(rclcpp::Parameter parameter)
+  bool update_parameters(const rclcpp::Parameter & parameter, bool send_can)
   {
     if (parameter.get_name() == "velocity_mode_limit_cur") {
       velocity_mode_limit_cur_ = parameter.as_double();
-      robstride_driver_->setSingleParameterWrite_float(
-        RobstrideIndex::LIMIT_CUR, velocity_mode_limit_cur_);
-      delay();
+      if (send_can) {
+        robstride_driver_->setSingleParameterWrite_float(
+          RobstrideIndex::LIMIT_CUR, velocity_mode_limit_cur_);
+        delay();
+      }
     } else if (parameter.get_name() == "velocity_mode_acc_rad") {
       velocity_mode_acc_rad_ = parameter.as_double();
-      robstride_driver_->setSingleParameterWrite_float(
-        RobstrideIndex::ACC_RAD, velocity_mode_acc_rad_);
-      delay();
+      if (send_can) {
+        robstride_driver_->setSingleParameterWrite_float(
+          RobstrideIndex::ACC_RAD, velocity_mode_acc_rad_);
+        delay();
+      }
     } else if (parameter.get_name() == "csp_mode_limit_spd") {
       csp_mode_limit_spd_ = parameter.as_double();
-      robstride_driver_->setSingleParameterWrite_float(
-        RobstrideIndex::LIMIT_SPD, csp_mode_limit_spd_);
-      delay();
+      if (send_can) {
+        robstride_driver_->setSingleParameterWrite_float(
+          RobstrideIndex::LIMIT_SPD, csp_mode_limit_spd_);
+        delay();
+      }
     } else if (parameter.get_name() == "pp_mode_vel_max") {
       pp_mode_vel_max_ = parameter.as_double();
-      robstride_driver_->setSingleParameterWrite_float(RobstrideIndex::VEL_MAX, pp_mode_vel_max_);
-      delay();
+      if (send_can) {
+        robstride_driver_->setSingleParameterWrite_float(
+          RobstrideIndex::VEL_MAX, pp_mode_vel_max_);
+        delay();
+      }
     } else if (parameter.get_name() == "pp_mode_acc_set") {
       pp_mode_acc_set_ = parameter.as_double();
-      robstride_driver_->setSingleParameterWrite_float(RobstrideIndex::ACC_SET, pp_mode_acc_set_);
-      delay();
+      if (send_can) {
+        robstride_driver_->setSingleParameterWrite_float(
+          RobstrideIndex::ACC_SET, pp_mode_acc_set_);
+        delay();
+      }
     } else if (parameter.get_name() == "epscan_time_ms") {
       // epscan_timeの初期値は10msで1
       // 5ms増えるとepscan_timeが1増えるようにする
       epscan_time_ = (parameter.as_int() - 5) / 5;
-      robstride_driver_->setSingleParameterWrite_uint16(RobstrideIndex::EPSCAN_TIME, epscan_time_);
-      delay();
+      if (send_can) {
+        robstride_driver_->setSingleParameterWrite_uint16(
+          RobstrideIndex::EPSCAN_TIME, epscan_time_);
+        delay();
+      }
     } else {
       RCLCPP_ERROR(this->get_logger(), "Unknown parameter: %s", parameter.get_name().c_str());
       return false;
@@ -475,6 +502,7 @@ public:
   std::string robstride_type_str_;
   RobstrideType robstride_type_;
   bool enable_initialize_;
+  bool can_configuration_enabled_{true};
   double publish_timer_rate_;
   // velocity modeのパラメータ
   float velocity_mode_limit_cur_;
