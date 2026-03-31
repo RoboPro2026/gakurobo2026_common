@@ -156,6 +156,7 @@ monitor_reg周りでトラブルが発生したら、トラブルシューティ
       * **注意**:
           * `set_speed_gains: true` のときは、`speed_gain_*` に加えて `torque_lim` も同時に設定されます。
           * `set_pos_gains: true` のときは、`pos_gain_*` に加えて `speed_lim` も同時に設定されます。
+          * `set_control_type: true` のときは、`motor_number` で指定した 1 軸だけ `control_type` を更新します。
 
   * **例: 速度PIDゲインの設定（+ トルク制限値）(board\_id=0, モーター0)**
     ```bash
@@ -216,6 +217,15 @@ monitor_reg周りでトラブルが発生したら、トラブルシューティ
       motor_number: 0,
       set_abs_turn_cnt: true,
       abs_turn_cnt: 0
+    }'
+    ```
+
+  * **例: 制御方式の設定 (board\_id=0, モーター0)**
+    ```bash
+    ros2 service call /set_robomas_gains sabacan_msgs/srv/SetRobomasGains '{
+      motor_number: 0,
+      set_control_type: true,
+      control_type: "POSITION"
     }'
     ```
 

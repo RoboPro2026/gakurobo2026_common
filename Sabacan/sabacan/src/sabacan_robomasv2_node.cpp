@@ -402,6 +402,46 @@ private:
     return result;
   }
 
+  bool update_single_control_type(
+    int motor_number, const std::string & control_type, bool send_can, std::string & error_message)
+  {
+    if (motor_number < 0 || motor_number >= N) {
+      error_message = "Invalid motor number";
+      return false;
+    }
+
+    const bool is_dji_motor =
+      (motor_type_[motor_number] == RobomasV2::CONTROL_MOTOR_C610 ||
+       motor_type_[motor_number] == RobomasV2::CONTROL_MOTOR_C620);
+    const bool is_vesc = (motor_type_[motor_number] == RobomasV2::CONTROL_MOTOR_VESC);
+    const bool is_dji_motor_map_ok = is_dji_motor && control_type_map_.contains(control_type);
+    const bool is_vesc_map_ok = is_vesc && vesc_mode_map_.contains(control_type);
+
+    if (!is_dji_motor_map_ok && !is_vesc_map_ok) {
+      error_message = "Unsupported control_type for motor " + std::to_string(motor_number) + ": " +
+                      control_type;
+      return false;
+    }
+
+    control_type_name_[motor_number] = control_type;
+    if (is_dji_motor_map_ok) {
+      control_type_[motor_number] = control_type_map_[control_type];
+      vesc_mode_[motor_number] = RobomasV2::VESC_MODE_DISABLE;
+    } else if (is_vesc_map_ok) {
+      vesc_mode_[motor_number] = vesc_mode_map_[control_type];
+    }
+
+    if (send_can) {
+      robomas_driver_->setControl(
+        motor_number, static_cast<uint8_t>(control_type_[motor_number]),
+        static_cast<uint8_t>(motor_type_[motor_number]), dob_en_[motor_number],
+        abs_enc_en_[motor_number], md_guess_en_[motor_number]);
+      robomas_driver_->setVescMode(motor_number, vesc_mode_[motor_number]);
+    }
+
+    return true;
+  }
+
   // サービスコールバック
   void set_gains_callback(
     const std::shared_ptr<sabacan_msgs::srv::SetRobomasGains::Request> request,
@@ -416,6 +456,16 @@ private:
     try {
       int n = request->motor_number;
       const bool send_can = can_configuration_enabled_;
+
+      if (request->set_control_type) {
+        std::string error_message;
+        if (!update_single_control_type(n, request->control_type, send_can, error_message)) {
+          response->success = false;
+          response->message = error_message;
+          return;
+        }
+        this->set_parameter(rclcpp::Parameter("control_type", control_type_name_));
+      }
 
       if (request->set_dob_param) {
         if (request->dob_load_j < 0.0) {

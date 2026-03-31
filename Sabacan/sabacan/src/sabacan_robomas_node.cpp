@@ -1,3 +1,7 @@
+// sabacan_robomas_nodeは現在使用していません。
+// そのため全文コメントアウトします。
+/*
+
 #include <functional>
 #include <memory>
 #include <string>
@@ -403,11 +407,13 @@ private:
   float speed_lim_[4];
   bool enable_monitor_period_ = true;
 };
+*/
 
+// ビルドがおかしくなるので、main関数だけは残してあります
 int main(int argc, char * argv[])
 {
-  rclcpp::init(argc, argv);
-  rclcpp::spin(std::make_shared<SabaneCanNode>());
-  rclcpp::shutdown();
+  // rclcpp::init(argc, argv);
+  // rclcpp::spin(std::make_shared<SabaneCanNode>());
+  // rclcpp::shutdown();
   return 0;
 }

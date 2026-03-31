@@ -5,7 +5,10 @@
 #include <rclcpp/rclcpp.hpp>
 #include <sabacan_msgs/msg/sabacan_robomas_ref.hpp>
 #include <sabacan_msgs/msg/sabacan_robomas_status.hpp>
+#include <sabacan_msgs/srv/set_robomas_gains.hpp>
 #include <sabacan_single_control_msgs/msg/sabacan_robomas_single_ref.hpp>
+#include <algorithm>
+#include <cctype>
 #include <string>
 #include <thread>
 #include <unordered_set>
@@ -35,6 +38,9 @@ public:
     this->declare_parameter(
       "control_type", std::string("VELOCITY"));  // 制御方式(VELOCITY, POSITION, CURRENT, TORQUE)
     this->declare_parameter("change_mode_delay", 0.2);  // モード変更後の待機時間[s]
+    this->declare_parameter(
+      "control_type_update_method",
+      std::string("parameter"));  // control_type切替方法(parameter, service)
 
     board_id_ = this->get_parameter("board_id").as_int();
     motor_number_ = this->get_parameter("motor_number").as_int();
@@ -42,6 +48,9 @@ public:
     control_type_ = this->get_parameter("control_type").as_string();
     float control_cycle_ = this->get_parameter("control_cycle").as_double();
     change_mode_delay_ = this->get_parameter("change_mode_delay").as_double();
+    control_type_update_method_ =
+      normalize_control_type_update_method(
+        this->get_parameter("control_type_update_method").as_string());
 
     // ROSで制御する場合のフィードバックの取得
     sabacan_robomas_sub_ = this->create_subscription<sabacan_msgs::msg::SabacanRobomasStatus>(
@@ -73,12 +82,31 @@ public:
     RCLCPP_INFO(this->get_logger(), "control_type: %s", control_type_.c_str());
     RCLCPP_INFO(this->get_logger(), "control_type: %s", control_type_.c_str());
     RCLCPP_INFO(this->get_logger(), "control_cycle: %f", control_cycle_);
+    RCLCPP_INFO(
+      this->get_logger(), "control_type_update_method: %s", control_type_update_method_.c_str());
+    if (control_type_update_method_ == "parameter") {
+      RCLCPP_WARN(
+        this->get_logger(),
+        "control_type_update_method=parameter is kept for compatibility. service is recommended.");
+    }
 
     // 時刻比較での例外(Clock type mismatch)を防ぐため、ノードのクロックタイプで初期化
     control_mode_enable_time_ = rclcpp::Time(0, 0, this->get_clock()->get_clock_type());
   }
 
 private:
+  static std::string normalize_control_type_update_method(const std::string & method)
+  {
+    std::string normalized = method;
+    std::transform(
+      normalized.begin(), normalized.end(), normalized.begin(),
+      [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    if (normalized == "service") {
+      return normalized;
+    }
+    return "parameter";
+  }
+
   void sabacanRobomasStatusCallback(const sabacan_msgs::msg::SabacanRobomasStatus::SharedPtr msg)
   {
     if (msg->motor_number == motor_number_) {
@@ -133,8 +161,6 @@ private:
 
         // 制御方式が変わったときのみ、パラメータを変更する
         setSingleRobomasControlType(sabacan_robomas_single_ref_.control_type);
-        prev_control_type_ = sabacan_robomas_single_ref_.control_type;
-        control_type_ = sabacan_robomas_single_ref_.control_type;
         is_pre_switch_safe_sent_ = false;
       }
       // control_type の変更中、または変更後の待機時間中はpublishしない
@@ -164,11 +190,8 @@ private:
     // そのうち実装する
   }
 
-  // sabacan_robomas_node<board_id> の control_type パラメータを設定する
-  // CLI の `ros2 param set /sabacan_robomas_node<board_id> control_type [...]` と等価
-  bool setRobomasControlType(const std::vector<std::string> & control_type)
+  bool setRobomasControlTypeByParameter(const std::vector<std::string> & control_type)
   {
-    // V1基板は4モーター想定。サイズ不一致はエラー扱い
     if (control_type.size() != 4) {
       RCLCPP_WARN(
         this->get_logger(), "control_type must have 4 elements. given: %zu", control_type.size());
@@ -177,7 +200,6 @@ private:
 
     const std::string service_name =
       "/sabacan_robomasv2_node_id" + std::to_string(board_id_) + "/set_parameters";
-    // 永続クライアントを用意
     if (!set_param_client_) {
       set_param_client_ = this->create_client<rcl_interfaces::srv::SetParameters>(service_name);
     }
@@ -188,16 +210,14 @@ private:
     }
 
     auto request = std::make_shared<rcl_interfaces::srv::SetParameters::Request>();
-
     rcl_interfaces::msg::Parameter param;
     param.name = "control_type";
     param.value.type = rcl_interfaces::msg::ParameterType::PARAMETER_STRING_ARRAY;
     param.value.string_array_value = control_type;
     request->parameters.push_back(param);
 
-    // 非ブロッキングで送信。応答はコールバックでログのみ行う
     auto future = set_param_client_->async_send_request(
-      request, [this](rclcpp::Client<rcl_interfaces::srv::SetParameters>::SharedFuture response) {
+      request, [this, control_type](rclcpp::Client<rcl_interfaces::srv::SetParameters>::SharedFuture response) {
         bool all_success = true;
         for (const auto & result : response.get()->results) {
           if (!result.successful) {
@@ -205,38 +225,33 @@ private:
             RCLCPP_WARN(this->get_logger(), "Parameter set failed: %s", result.reason.c_str());
           }
         }
-        if (all_success) {
-          // control_type 変更完了。Delayを設定してフラグ解除
-          // ※ ここでフラグをfalseにするが、timerCallback側で時刻チェックも行っているため安全
-          control_mode_enable_time_ = this->now() + rclcpp::Duration::from_seconds(change_mode_delay_);
+        if (!all_success) {
           pending_control_type_change_ = false;
-          RCLCPP_INFO(
-            this->get_logger(), "Set control_type on /sabacan_robomasv2_node_id%d successfully. Wait %.2fs",
-            board_id_, change_mode_delay_);
+          return;
         }
+
+        prev_control_type_ = control_type[motor_number_];
+        control_type_ = control_type[motor_number_];
+        control_mode_enable_time_ = this->now() + rclcpp::Duration::from_seconds(change_mode_delay_);
+        pending_control_type_change_ = false;
+        RCLCPP_INFO(
+          this->get_logger(),
+          "Set control_type[%d]=%s successfully via parameter on board_id=%d. Wait %.2fs",
+          motor_number_, control_type_.c_str(), board_id_, change_mode_delay_);
       });
-    (void)future;  // 使わないが、ここで破棄しない
+    (void)future;
     return true;
   }
 
-  // 単一モータの control_type を変更（V2仕様の値を許容）
-  bool setSingleRobomasControlType(const std::string & control_type)
+  bool setSingleRobomasControlTypeByParameter(const std::string & control_type)
   {
-    if (motor_number_ > 3) {
-      RCLCPP_WARN(this->get_logger(), "motor_number must be 0..3. given: %u", motor_number_);
-      return false;
-    }
-
-    // 許容されるV2の制御モード
     static const std::unordered_set<std::string> kAllowed = {"TORQUE", "VELOCITY", "POSITION",
                                                              "PWM",    "CURRENT",  "DISABLE"};
     if (kAllowed.find(control_type) == kAllowed.end()) {
-      RCLCPP_WARN(this->get_logger(), "Unsupported control_type for V2: %s", control_type.c_str());
+      RCLCPP_WARN(
+        this->get_logger(), "Unsupported control_type for parameter mode: %s", control_type.c_str());
       return false;
     }
-
-    // 変更処理中フラグを立てる（応答成功時に解除）
-    pending_control_type_change_ = true;
 
     const std::string get_srv =
       "/sabacan_robomasv2_node_id" + std::to_string(board_id_) + "/get_parameters";
@@ -245,17 +260,18 @@ private:
     }
     if (!get_param_client_->wait_for_service(std::chrono::seconds(2))) {
       RCLCPP_ERROR(this->get_logger(), "Service not available: %s", get_srv.c_str());
+      pending_control_type_change_ = false;
       return false;
     }
 
     auto get_req = std::make_shared<rcl_interfaces::srv::GetParameters::Request>();
     get_req->names = {"control_type"};
-    // 非ブロッキング: get -> set を応答コールバックで連鎖
     auto future_get = get_param_client_->async_send_request(
       get_req, [this, control_type](
                  rclcpp::Client<rcl_interfaces::srv::GetParameters>::SharedFuture get_res_fut) {
         auto get_res = get_res_fut.get();
         if (get_res->values.size() != 1) {
+          pending_control_type_change_ = false;
           RCLCPP_ERROR(
             this->get_logger(), "get_parameters returned unexpected number of values: %zu",
             get_res->values.size());
@@ -278,22 +294,70 @@ private:
             this->get_logger(), "control_type param type is not STRING_ARRAY. type=%u", pv.type);
         }
         array[motor_number_] = control_type;
-        (void)setRobomasControlType(array);
+        if (!setRobomasControlTypeByParameter(array)) {
+          pending_control_type_change_ = false;
+          return;
+        }
         RCLCPP_INFO(
-          this->get_logger(), "Set control_type[%u]=%s requested on /sabacan_robomasv2_node_id%d",
+          this->get_logger(),
+          "Set control_type[%d]=%s requested via parameter on /sabacan_robomasv2_node_id%d",
           motor_number_, control_type.c_str(), board_id_);
-
-        // パラメータ設定リクエストを投げたので、完了応答待ちを解除するが、
-        // 実際にはsetRobomasControlTypeの非同期応答(set_param_client_)でpending解除すべき。
-        // しかし現在の構造ではsetRobomasControlType内ですぐにpending解除しているため、
-        // ここでは追加のDelayを設定する。
-        // ※ 本来は setRobomasControlType のコールバックチェーンでフラグ操作すべきだが、
-        //    既存コード(setRobomasControlType)がpending_control_type_change_を操作しているのでそれに従う。
-        //    ただし、setRobomasControlTypeの実装を見ると、全てのresultがsuccessのときのみフラグを下ろしている。
-        //    ここ(get_param callback)はリクエストを投げただけなので、まだフラグを下ろしてはいけない。
-        //    setRobomasControlType側のcallbackでフラグが落ち、そのタイミングでDelayをセットする必要がある。
       });
     (void)future_get;
+    return true;
+  }
+
+  bool setSingleRobomasControlType(const std::string & control_type)
+  {
+    if (motor_number_ > 3) {
+      RCLCPP_WARN(this->get_logger(), "motor_number must be 0..3. given: %u", motor_number_);
+      return false;
+    }
+
+    // 変更処理中フラグを立てる（応答成功時に解除）
+    pending_control_type_change_ = true;
+
+    if (control_type_update_method_ == "parameter") {
+      return setSingleRobomasControlTypeByParameter(control_type);
+    }
+
+    const std::string service_name = "set_robomas_gains";
+    if (!set_gains_client_) {
+      set_gains_client_ = this->create_client<sabacan_msgs::srv::SetRobomasGains>(service_name);
+    }
+    if (!set_gains_client_->wait_for_service(std::chrono::seconds(2))) {
+      RCLCPP_ERROR(this->get_logger(), "Service not available: %s", service_name.c_str());
+      pending_control_type_change_ = false;
+      return false;
+    }
+
+    auto request = std::make_shared<sabacan_msgs::srv::SetRobomasGains::Request>();
+    request->motor_number = static_cast<uint8_t>(motor_number_);
+    request->control_type = control_type;
+    request->set_control_type = true;
+
+    auto future = set_gains_client_->async_send_request(
+      request, [this, control_type](
+                 rclcpp::Client<sabacan_msgs::srv::SetRobomasGains>::SharedFuture response) {
+        const auto result = response.get();
+        if (!result->success) {
+          pending_control_type_change_ = false;
+          RCLCPP_WARN(
+            this->get_logger(), "Set control_type failed on board_id=%d motor=%d: %s", board_id_,
+            motor_number_, result->message.c_str());
+          return;
+        }
+
+        prev_control_type_ = control_type;
+        control_type_ = control_type;
+        control_mode_enable_time_ = this->now() + rclcpp::Duration::from_seconds(change_mode_delay_);
+        pending_control_type_change_ = false;
+        RCLCPP_INFO(
+          this->get_logger(),
+          "Set control_type[%d]=%s successfully on board_id=%d. Wait %.2fs", motor_number_,
+          control_type.c_str(), board_id_, change_mode_delay_);
+      });
+    (void)future;
     return true;
   }
 
@@ -301,6 +365,7 @@ private:
   int motor_number_;
   std::string control_mode_;
   std::string control_type_;
+  std::string control_type_update_method_;
   std::string
     prev_control_type_;  // 前回の制御方式（制御方式が変わったときのみ、パラメータを変更する）
 
@@ -311,6 +376,7 @@ private:
   rclcpp::TimerBase::SharedPtr timer_;
   rclcpp::Client<rcl_interfaces::srv::SetParameters>::SharedPtr set_param_client_;
   rclcpp::Client<rcl_interfaces::srv::GetParameters>::SharedPtr get_param_client_;
+  rclcpp::Client<sabacan_msgs::srv::SetRobomasGains>::SharedPtr set_gains_client_;
   sabacan_msgs::msg::SabacanRobomasRef sabacan_robomas_ref_;
   sabacan_msgs::msg::SabacanRobomasStatus sabacan_robomas_status_;
   sabacan_single_control_msgs::msg::SabacanRobomasSingleRef sabacan_robomas_single_ref_;
