@@ -53,13 +53,13 @@ public:
     this->declare_parameter("dob_cf", std::vector<double>{5.0, 5.0, 5.0, 5.0});
     // PIDゲインパラメータの宣言
     this->declare_parameter("speed_gain_p", std::vector<double>{0.5, 0.5, 0.5, 0.5});
-    this->declare_parameter("speed_gain_i", std::vector<double>{0.2, 0.2, 0.2, 0.2});
+    this->declare_parameter("speed_gain_i", std::vector<double>{0.1, 0.1, 0.1, 0.1});
     this->declare_parameter("speed_gain_d", std::vector<double>{0.0, 0.0, 0.0, 0.0});
-    this->declare_parameter("torque_lim", std::vector<double>{5.0, 5.0, 5.0, 5.0});
-    this->declare_parameter("pos_gain_p", std::vector<double>{6.0, 6.0, 6.0, 6.0});
-    this->declare_parameter("pos_gain_i", std::vector<double>{3.0, 3.0, 3.0, 3.0});
+    this->declare_parameter("torque_lim", std::vector<double>{1.0, 1.0, 1.0, 1.0});
+    this->declare_parameter("pos_gain_p", std::vector<double>{5.0, 5.0, 5.0, 5.0});
+    this->declare_parameter("pos_gain_i", std::vector<double>{0.0, 0.0, 0.0, 0.0});
     this->declare_parameter("pos_gain_d", std::vector<double>{0.0, 0.0, 0.0, 0.0});
-    this->declare_parameter("speed_lim", std::vector<double>{30.0, 30.0, 30.0, 30.0});
+    this->declare_parameter("speed_lim", std::vector<double>{10.0, 10.0, 10.0, 10.0});
     this->declare_parameter("abs_turn_cnt", std::vector<int64_t>{0, 0, 0, 0});
     this->declare_parameter("vesc_pole", std::vector<int64_t>{14, 14, 14, 14});
     // モニター機能のパラメータ
@@ -418,8 +418,8 @@ private:
     const bool is_vesc_map_ok = is_vesc && vesc_mode_map_.contains(control_type);
 
     if (!is_dji_motor_map_ok && !is_vesc_map_ok) {
-      error_message = "Unsupported control_type for motor " + std::to_string(motor_number) + ": " +
-                      control_type;
+      error_message =
+        "Unsupported control_type for motor " + std::to_string(motor_number) + ": " + control_type;
       return false;
     }
 
