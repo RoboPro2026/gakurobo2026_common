@@ -709,12 +709,14 @@ private:
           vesc_mode_[i] = vesc_mode_map_[control_type_name_[i]];
         }
         // 設定を送信
-        // control_typeが切り替わったときは、急いでいる可能性があるので、delayは入れない
         if (send_can) {
           robomas_driver_->setControl(
             i, (uint8_t)control_type_[i], (uint8_t)motor_type_[i], dob_en_[i], abs_enc_en_[i],
             md_guess_en_[i]);
+          // control_typeが切り替わったときは、急いでいる可能性があるので、ここにはdelayは入れない
           robomas_driver_->setVescMode(i, vesc_mode_[i]);
+          // 同じモータへの設定が終わったらdelayを入れる
+          delay();
         }
       }
     } else if (name == "dob_en") {
