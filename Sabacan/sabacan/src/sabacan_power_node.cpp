@@ -34,6 +34,7 @@ public:
 
     this->declare_parameter("enable_initialize", true);
     this->get_parameter("enable_initialize", enable_initialize_);
+    can_configuration_enabled_ = enable_initialize_;
     this->declare_parameter("publish_timer_rate", 100.0);
     this->get_parameter("publish_timer_rate", publish_timer_rate_);
 
@@ -103,9 +104,7 @@ public:
       std::chrono::duration<double>(1.0 / publish_timer_rate_),
       std::bind(&SabacanPowerNode::timer_callback, this));
 
-    if (enable_initialize_) {
-      power_init();
-    }
+    power_init(can_configuration_enabled_);
   }
 
   template <typename T>
@@ -231,7 +230,7 @@ public:
     bool ret = true;
 
     for (const auto & parameter : parameters) {
-      if ((ret = update_parameters(parameter)))
+      if ((ret = update_parameters(parameter, can_configuration_enabled_)))
         RCLCPP_INFO(this->get_logger(), "Updated parameter: %s", parameter.get_name().c_str());
       if (ret == false) {
         result.successful = false;
@@ -251,7 +250,8 @@ public:
       RCLCPP_INFO(this->get_logger(), "Received reset request for Power node");
 
       // 初期化処理を実行
-      power_init();
+      power_init(true);
+      can_configuration_enabled_ = true;
 
       response->success = true;
       response->message = "Power node reset completed successfully";
@@ -264,7 +264,7 @@ public:
     }
   }
 
-  void power_init()
+  void power_init(bool send_can)
   {
     std::vector<std::string> param_name{"cell_n",         "ex_ems_trg",  "common_ems_en",
                                         "v_limit_high",   "v_limit_low", "i_limit",
@@ -274,62 +274,86 @@ public:
 
     for (size_t i = 0; i < param_name.size(); i++) {
       // update_parameters関数内ではdelayが入っている。
-      update_parameters(this->get_parameter(param_name[i]));
+      update_parameters(this->get_parameter(param_name[i]), send_can);
     }
 
     rclcpp::Time end_time = this->get_clock()->now();
-    RCLCPP_INFO(
-      this->get_logger(), "Initialization completed in %.3f seconds",
-      (end_time - start_time).seconds());
+    if (send_can) {
+      RCLCPP_INFO(
+        this->get_logger(), "Initialization completed in %.3f seconds",
+        (end_time - start_time).seconds());
+    } else {
+      RCLCPP_INFO(
+        this->get_logger(), "Power parameters cached without CAN transmission in %.3f seconds",
+        (end_time - start_time).seconds());
+    }
   }
 
   void delay() { std::this_thread::sleep_for(10ms); }
 
-  bool update_parameters(const rclcpp::Parameter & parameter)
+  bool update_parameters(const rclcpp::Parameter & parameter, bool send_can)
   {
     const std::string & name = parameter.get_name();
 
     if (name == "cell_n") {
       cell_n_ = parameter.as_int();
-      power_driver_->setCellN(cell_n_);
-      delay();
+      if (send_can) {
+        power_driver_->setCellN(cell_n_);
+        delay();
+      }
     } else if (name == "ex_ems_trg") {
       ex_ems_trg_ = parameter.as_int();
-      power_driver_->setExEmsTrg(ex_ems_trg_);
-      delay();
+      if (send_can) {
+        power_driver_->setExEmsTrg(ex_ems_trg_);
+        delay();
+      }
     } else if (name == "common_ems_en") {
       common_ems_en_ = parameter.as_bool();
-      power_driver_->setCommonEmsEn(common_ems_en_);
-      delay();
+      if (send_can) {
+        power_driver_->setCommonEmsEn(common_ems_en_);
+        delay();
+      }
     } else if (name == "v_limit_high") {
       v_limit_high_ = parameter.as_double();
-      power_driver_->setVLimitHigh(v_limit_high_);
-      delay();
+      if (send_can) {
+        power_driver_->setVLimitHigh(v_limit_high_);
+        delay();
+      }
     } else if (name == "v_limit_low") {
       v_limit_low_ = parameter.as_double();
-      power_driver_->setVLimitLow(v_limit_low_);
-      delay();
+      if (send_can) {
+        power_driver_->setVLimitLow(v_limit_low_);
+        delay();
+      }
     } else if (name == "i_limit") {
       i_limit_ = parameter.as_double();
-      power_driver_->setILimit(i_limit_);
-      delay();
+      if (send_can) {
+        power_driver_->setILimit(i_limit_);
+        delay();
+      }
     } else if (name == "monitor_period") {
       monitor_period_ = parameter.as_int();
-      power_driver_->setMonitorPeriod(monitor_period_);
-      delay();
-    } else if (name == "monitor_reg") {
-      monitor_reg_ = parameter.as_int();
-      power_driver_->setMonitorReg(monitor_reg_);
-      delay();
-    } else if (name == "enable_monitor_period") {
-      enable_monitor_period_ = parameter.as_bool();
-      if (enable_monitor_period_) {
+      if (send_can) {
         power_driver_->setMonitorPeriod(monitor_period_);
         delay();
+      }
+    } else if (name == "monitor_reg") {
+      monitor_reg_ = parameter.as_int();
+      if (send_can) {
         power_driver_->setMonitorReg(monitor_reg_);
-      } else {
-        power_driver_->setMonitorPeriod(0);
         delay();
+      }
+    } else if (name == "enable_monitor_period") {
+      enable_monitor_period_ = parameter.as_bool();
+      if (send_can) {
+        if (enable_monitor_period_) {
+          power_driver_->setMonitorPeriod(monitor_period_);
+          delay();
+          power_driver_->setMonitorReg(monitor_reg_);
+        } else {
+          power_driver_->setMonitorPeriod(0);
+          delay();
+        }
       }
     } else {
       RCLCPP_ERROR(this->get_logger(), "Unknown parameter: %s", name.c_str());
@@ -354,6 +378,7 @@ private:
 
   int64_t board_id_;
   bool enable_initialize_;
+  bool can_configuration_enabled_{true};
   double publish_timer_rate_;
   int cell_n_;
   int ex_ems_trg_;

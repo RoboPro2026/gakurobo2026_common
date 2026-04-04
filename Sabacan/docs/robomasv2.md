@@ -58,6 +58,8 @@ ros2 run sabacan sabacan_robomasv2_node --ros-args -p board_id:=0 \
       * **初期値**: `[false, false, false, false]`。
   * `md_guess_en` (bool配列): モータパラメータ推定機能の有効/無効。
       * **初期値**: `[false, false, false, false]`。
+  * `keep_mode` (bool配列): 非常停止が押されたときにCONTROL_MODEを保存→非常停止解除で回復させるか。falseの場合は非常停止を解除してもTORQUEのままになる。
+      * **初期値**: `[false, false, false, false]`。
   * `abs_gear_ratio` (double配列): アブソリュートエンコーダのギア比。
       * **初期値**: `[1.0, 1.0, 1.0, 1.0]`。
       * モーターの出力軸からアブソに至るまでの減速比　回転方向が反転するなら負の値を入力
@@ -72,19 +74,19 @@ ros2 run sabacan sabacan_robomasv2_node --ros-args -p board_id:=0 \
   * `speed_gain_p` (double配列): 速度制御の **Pゲイン**。
       * **初期値**: `[0.5, 0.5, 0.5, 0.5]`。
   * `speed_gain_i` (double配列): 速度制御の **Iゲイン**。
-      * **初期値**: `[0.2, 0.2, 0.2, 0.2]`。
+      * **初期値**: `[0.1, 0.1, 0.1, 0.1]`。
   * `speed_gain_d` (double配列): 速度制御の **Dゲイン**。
       * **初期値**: `[0.0, 0.0, 0.0, 0.0]`。
   * `torque_lim` (double配列): 速度制御時の **トルク制限値** [Nm]。
       * **初期値**: `[5.0, 5.0, 5.0, 5.0]`。
   * `pos_gain_p` (double配列): 位置制御の **Pゲイン**。
-      * **初期値**: `[6.0, 6.0, 6.0, 6.0]`。
+      * **初期値**: `[5.0, 5.0, 5.0, 5.0]`。
   * `pos_gain_i` (double配列): 位置制御の **Iゲイン**。
-      * **初期値**: `[3.0, 3.0, 3.0, 3.0]`。
+      * **初期値**: `[0.0, 0.0, 0.0, 0.0]`。
   * `pos_gain_d` (double配列): 位置制御の **Dゲイン**。
       * **初期値**: `[0.0, 0.0, 0.0, 0.0]`。
   * `speed_lim` (double配列): 位置制御時の **速度制限値** [rad/s]。
-      * **初期値**: `[30.0, 30.0, 30.0, 30.0]`。
+      * **初期値**: `[10.0, 10.0, 10.0, 10.0]`。
   * `abs_turn_cnt` (int64配列): アブソリュートエンコーダの回転数オフセット。
       * **初期値**: `[0, 0, 0, 0]`。
   * `vesc_pole` (int64配列): VESCのモータの極数。これを正しく設定しないと、速度指令値がerpmなのでおかしくなる。
@@ -156,6 +158,7 @@ monitor_reg周りでトラブルが発生したら、トラブルシューティ
       * **注意**:
           * `set_speed_gains: true` のときは、`speed_gain_*` に加えて `torque_lim` も同時に設定されます。
           * `set_pos_gains: true` のときは、`pos_gain_*` に加えて `speed_lim` も同時に設定されます。
+          * `set_control_type: true` のときは、`motor_number` で指定した 1 軸だけ `control_type` を更新します。
 
   * **例: 速度PIDゲインの設定（+ トルク制限値）(board\_id=0, モーター0)**
     ```bash
@@ -216,6 +219,15 @@ monitor_reg周りでトラブルが発生したら、トラブルシューティ
       motor_number: 0,
       set_abs_turn_cnt: true,
       abs_turn_cnt: 0
+    }'
+    ```
+
+  * **例: 制御方式の設定 (board\_id=0, モーター0)**
+    ```bash
+    ros2 service call /set_robomas_gains sabacan_msgs/srv/SetRobomasGains '{
+      motor_number: 0,
+      set_control_type: true,
+      control_type: "POSITION"
     }'
     ```
 

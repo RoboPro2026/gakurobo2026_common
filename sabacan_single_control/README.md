@@ -20,6 +20,7 @@
   - `control_cycle`: 制御周期[Hz]。デフォルトは`100.0`
   - `control_type`: 制御方式。`"VELOCITY"`, `"POSITION"`, `"CURRENT"`, `"TORQUE"`。デフォルトは`"VELOCITY"`
   - `change_mode_delay`: モード変更後の待機時間[s]。デフォルトは`0.2`。この期間中は指令値の送信を停止する。
+  - `control_type_update_method`: `control_type` の切替方法。`"parameter"` または `"service"`。デフォルトは互換性維持のため `"parameter"`。推奨は `"service"`。
 
 - メッセージ型
   - `/sabacan_robomas_ref<board_id>`: `sabacan_msgs::msg::SabacanRobomasRef`
@@ -53,6 +54,56 @@
 
 - `SABANE`: 基板側で制御。さばね謹製 PID & DOB
 - `ROS`: ROS2 側で制御。全部１から制御したい人向け。まだ実装してない。
+
+# control_type の切替方法
+
+- `parameter`:
+  - 互換性維持用の旧方式。
+  - `/sabacan_robomasv2_node_id<board_id>/get_parameters` と `/set_parameters` を使って `control_type` 配列を書き換える。
+- `service`:
+  - 推奨方式。
+  - `SetRobomasGains` service を使って、対象モータ 1 軸だけの `control_type` を更新する。
+  - 複数の `single_control_node` が同じ基板を同時に扱う場合でも、配列の read-modify-write 競合を避けやすい。
+
+## service 方式の remap
+
+`control_type_update_method:="service"` を使う場合、`sabacan_single_control_node` の service client 名 `set_robomas_gains` を、実際の基板別 service 名へ remap する。
+
+- `ros2 run` の例:
+  ```bash
+  ros2 run sabacan_single_control sabacan_single_control_node --ros-args \
+    -p board_id:=2 \
+    -p motor_number:=0 \
+    -p control_type_update_method:=service \
+    -r set_robomas_gains:=/set_robomas_gains_id2
+  ```
+
+- launch の例:
+  ```python
+  remappings=[
+      ("set_robomas_gains", f"set_robomas_gains_id{board_id}"),
+  ]
+  ```
+
+同時に、`sabacan_robomasv2_node` 側でも service server 名 `set_robomas_gains` を同じ基板別 service 名へ remap しておく必要がある。
+
+- `sabacan_robomasv2_node` の launch 例:
+  ```python
+  remappings=[
+      ("set_robomas_gains", f"set_robomas_gains_id{board_id}"),
+  ]
+  ```
+
+- `ros2 run` の例:
+  ```bash
+  ros2 run sabacan sabacan_robomasv2_node --ros-args \
+    -p board_id:=2 \
+    -r set_robomas_gains:=/set_robomas_gains_id2
+  ```
+
+つまり service 方式では、client 側の `sabacan_single_control_node` と server 側の `sabacan_robomasv2_node` の両方で、同じ `set_robomas_gains_id<board_id>` へ揃えて remap する。
+
+`r1_bringup.launch.py` と `test_bringup.launch.py` では、`sabacan_single_control_node` 側の remap を設定済みで、`r1_bringup.launch.py` では `sabacan_robomasv2_node` 側の remap も設定済みです。
 
 # 動作テスト
 

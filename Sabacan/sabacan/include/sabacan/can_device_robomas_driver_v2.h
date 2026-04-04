@@ -22,6 +22,7 @@ public:
   bool dob_en[N] = {0};
   bool abs_enc_en[N] = {0};
   bool md_guess_en[N] = {0};
+  bool keep_mode[N] = {0};
   float abs_gear_ratio[N] = {0};
   int8_t cal_rq[N] = {0};
   float load_j[N] = {0};
@@ -62,7 +63,7 @@ public:
 
   void setControl(
     int n, uint8_t _control_mode, uint8_t _control_motor, bool _dob_en, bool _abs_enc_en,
-    bool _md_guess_en)
+    bool _md_guess_en, bool _keep_mode)
   {
     uint8_t _control = 0;
     _control |= _control_mode & 0x03;
@@ -70,6 +71,7 @@ public:
     _control |= (uint8_t)_dob_en << 4;
     _control |= (uint8_t)_abs_enc_en << 5;
     _control |= (uint8_t)_md_guess_en << 6;
+    _control |= (uint8_t)_keep_mode << 7;
     tx(((n & 0xF) << 8) | RobomasV2::CONTROL, _control);
   }
 
@@ -151,6 +153,7 @@ public:
         dob_en[n] = (control[n] >> 4) & 0x01;
         abs_enc_en[n] = (control[n] >> 5) & 0x01;
         md_guess_en[n] = (control[n] >> 6) & 0x01;
+        keep_mode[n] = (control[n] >> 7) & 0x01;
         break;
       case RobomasV2::ABS_GEAR_RATIO:
         assign(&abs_gear_ratio[n], frame.data);
