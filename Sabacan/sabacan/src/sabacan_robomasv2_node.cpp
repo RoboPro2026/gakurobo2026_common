@@ -47,6 +47,7 @@ public:
     this->declare_parameter("dob_en", std::vector<bool>{false, false, false, false});
     this->declare_parameter("abs_enc_en", std::vector<bool>{false, false, false, false});
     this->declare_parameter("md_guess_en", std::vector<bool>{false, false, false, false});
+    this->declare_parameter("keep_mode", std::vector<bool>{false, false, false, false});
     this->declare_parameter("abs_gear_ratio", std::vector<double>{1.0, 1.0, 1.0, 1.0});
     this->declare_parameter("load_j", std::vector<double>{0.0005, 0.0005, 0.0005, 0.0005});
     this->declare_parameter("load_d", std::vector<double>{0.0004, 0.0004, 0.0004, 0.0004});
@@ -344,6 +345,7 @@ private:
       "dob_en",
       "abs_enc_en",
       "md_guess_en",
+      "keep_mode",
       "load_j",
       "load_d",
       "dob_cf",
@@ -435,7 +437,7 @@ private:
       robomas_driver_->setControl(
         motor_number, static_cast<uint8_t>(control_type_[motor_number]),
         static_cast<uint8_t>(motor_type_[motor_number]), dob_en_[motor_number],
-        abs_enc_en_[motor_number], md_guess_en_[motor_number]);
+        abs_enc_en_[motor_number], md_guess_en_[motor_number], keep_mode_[motor_number]);
       robomas_driver_->setVescMode(motor_number, vesc_mode_[motor_number]);
     }
 
@@ -665,7 +667,7 @@ private:
           if (is_dji_motor) {
             robomas_driver_->setControl(
               i, (uint8_t)control_type_[i], (uint8_t)motor_type_[i], dob_en_[i], abs_enc_en_[i],
-              md_guess_en_[i]);
+              md_guess_en_[i], keep_mode_[i]);
             delay();
           }
         }
@@ -712,7 +714,7 @@ private:
         if (send_can) {
           robomas_driver_->setControl(
             i, (uint8_t)control_type_[i], (uint8_t)motor_type_[i], dob_en_[i], abs_enc_en_[i],
-            md_guess_en_[i]);
+            md_guess_en_[i], keep_mode_[i]);
           // control_typeが切り替わったときは、急いでいる可能性があるので、ここにはdelayは入れない
           robomas_driver_->setVescMode(i, vesc_mode_[i]);
           // 同じモータへの設定が終わったらdelayを入れる
@@ -727,7 +729,7 @@ private:
           for (int i = 0; i < N; i++) {
             robomas_driver_->setControl(
               i, (uint8_t)control_type_[i], (uint8_t)motor_type_[i], dob_en_[i], abs_enc_en_[i],
-              md_guess_en_[i]);
+              md_guess_en_[i], keep_mode_[i]);
             delay();
           }
         }
@@ -740,7 +742,7 @@ private:
           for (int i = 0; i < N; i++) {
             robomas_driver_->setControl(
               i, (uint8_t)control_type_[i], (uint8_t)motor_type_[i], dob_en_[i], abs_enc_en_[i],
-              md_guess_en_[i]);
+              md_guess_en_[i], keep_mode_[i]);
             delay();
           }
         }
@@ -753,7 +755,20 @@ private:
           for (int i = 0; i < N; i++) {
             robomas_driver_->setControl(
               i, (uint8_t)control_type_[i], (uint8_t)motor_type_[i], dob_en_[i], abs_enc_en_[i],
-              md_guess_en_[i]);
+              md_guess_en_[i], keep_mode_[i]);
+            delay();
+          }
+        }
+      }
+    } else if (name == "keep_mode") {
+      auto tmp_param = parameter.as_bool_array();
+      if ((ret = check_size(tmp_param, N, name))) {
+        keep_mode_ = tmp_param;
+        if (send_can) {
+          for (int i = 0; i < N; i++) {
+            robomas_driver_->setControl(
+              i, (uint8_t)control_type_[i], (uint8_t)motor_type_[i], dob_en_[i], abs_enc_en_[i],
+              md_guess_en_[i], keep_mode_[i]);
             delay();
           }
         }
@@ -981,6 +996,7 @@ private:
   std::vector<bool> dob_en_ = std::vector<bool>(N);
   std::vector<bool> abs_enc_en_ = std::vector<bool>(N);
   std::vector<bool> md_guess_en_ = std::vector<bool>(N);
+  std::vector<bool> keep_mode_ = std::vector<bool>(N);
   std::vector<double> abs_gear_ratio_ = std::vector<double>(N);
   std::vector<double> load_j_ = std::vector<double>(N);
   std::vector<double> load_d_ = std::vector<double>(N);

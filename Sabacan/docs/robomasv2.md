@@ -58,6 +58,8 @@ ros2 run sabacan sabacan_robomasv2_node --ros-args -p board_id:=0 \
       * **初期値**: `[false, false, false, false]`。
   * `md_guess_en` (bool配列): モータパラメータ推定機能の有効/無効。
       * **初期値**: `[false, false, false, false]`。
+  * `keep_mode` (bool配列): 非常停止が押されたときにCONTROL_MODEを保存→非常停止解除で回復させるか。falseの場合は非常停止を解除してもTORQUEのままになる。
+      * **初期値**: `[false, false, false, false]`。
   * `abs_gear_ratio` (double配列): アブソリュートエンコーダのギア比。
       * **初期値**: `[1.0, 1.0, 1.0, 1.0]`。
       * モーターの出力軸からアブソに至るまでの減速比　回転方向が反転するなら負の値を入力
