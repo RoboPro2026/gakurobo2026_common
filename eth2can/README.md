@@ -107,37 +107,34 @@ ros2 topic echo /from_can_bus0
 `eth2can` は `device_ip` 宛に通常の TCP 接続を行うだけなので、「どの NIC（有線 / Wi‑Fi）から出ていくか」は Linux のルーティングテーブルに従います。
 有線LANとWi‑Fiが同時に繋がっていても問題ありませんが、宛先IPへの経路が Wi‑Fi 側になっていると接続できません。
 
-### 1) 実際にどのIFから出るか確認
+### デバッグ
+### Ethernetのセットアップ
+GUIの場合は画像で次のように選択すれば良い。
+USB-Etherenetの設定を選択する。
+![alt text](./docs/image1.png)
 
-例: ゲートウェイが `192.168.1.100` の場合
+IPアドレスの設定例は次のとおりである。IPアドレスは`192.168.1.100`以外だったら何でもよい。ゲートウェイは未入力、DNSは自動とする。
 
+![alt text](image2.png)
+
+Ethernetの設定を行ったら、ネットワークの設定の再行動を行うこと。やり方がわからない場合は、パソコンを再起動すればよい。
+
+### pingの確認
+pingを確認。かにはるはUSB-thernetなどを使用する。EthernetのIPアドレスは`192.168.1.100`以外のアドレスにすること。
 ```bash
-ip route get 192.168.1.100
+ping 192.168.1.100
 ```
 
-- 出力に `dev enp2s0` など有線IF名が出れば、有線経由で到達できる設定です
-- `dev wlp3s0` などWi‑Fiが出る場合、ゲートウェイが有線側にいるなら経路設定がNGです
-
-### 2) よくある原因（有線側にIPが付いていない）
-
-`ip addr` で、有線IF（例: `enp2s0`）に `inet ...`（IPv4）が無い場合は、有線経由で到達できません。
-
-```bash
-ip addr
-ip route
+正しいときの実行結果。pingの応答速度が早すぎる場合は、IPアドレスの設定が間違っていてループバックになっている可能性、遅いor帰ってこない場合は接続に問題があるので確認すること。
 ```
-
-### 3) 対処（固定IPの一例）
-
-DHCP が無いネットワークの場合、次のように有線IFへ `192.168.1.x/24` を付与します（例: `192.168.1.10`）。
-
-```bash
-# enp2s0 に固定IP(例)を付与する（※ 192.168.1.100 など機器側IPと同じにしないこと）
-sudo ip addr add 192.168.1.10/24 dev enp2s0
-# インタフェースを有効化する
-sudo ip link set enp2s0 up
-# 宛先 192.168.1.100 に対して、どのIF/送信元IPで出ていくか確認する（dev enp2s0 になればOK）
-ip route get 192.168.1.100
+robopro2026@robopro2026-Claw-A1M ~/ros2_ws
+$ ping 192.168.1.100
+PING 192.168.1.100 (192.168.1.100) 56(84) bytes of data.
+64 bytes from 192.168.1.100: icmp_seq=1 ttl=128 time=1.31 ms
+64 bytes from 192.168.1.100: icmp_seq=2 ttl=128 time=1.32 ms
+64 bytes from 192.168.1.100: icmp_seq=3 ttl=128 time=1.29 ms
+^C
+--- 192.168.1.100 ping statistics ---
+3 packets transmitted, 3 received, 0% packet loss, time 2003ms
+rtt min/avg/max/mdev = 1.290/1.307/1.320/0.012 ms
 ```
-
-`ip route get` の結果が `dev enp2s0` になればOKです（デフォルトルートは Wi‑Fi のままでも構いません）。
