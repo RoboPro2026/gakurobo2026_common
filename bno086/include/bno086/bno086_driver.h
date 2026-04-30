@@ -22,17 +22,17 @@ class BNO086Driver
 public:
   struct Data
   {
-    int index;
-    double yaw_angle;
-    double pitch_angle;
-    double roll_angle;
-    double x_axis_accel;
-    double y_axis_accel;
-    double z_axis_accel;
+    int index = 0;
+    double yaw_angle = 0.0;
+    double pitch_angle = 0.0;
+    double roll_angle = 0.0;
+    double x_axis_accel = 0.0;
+    double y_axis_accel = 0.0;
+    double z_axis_accel = 0.0;
     // パソコン上で微分して計算した値
-    double yaw_angular_velocity;
-    double pitch_angular_velocity;
-    double roll_angular_velocity;
+    double yaw_angular_velocity = 0.0;
+    double pitch_angular_velocity = 0.0;
+    double roll_angular_velocity = 0.0;
   };
 
 private:

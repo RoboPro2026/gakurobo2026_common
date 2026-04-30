@@ -75,6 +75,7 @@ public:
     offset_data_.x_axis_accel = this->get_parameter("offset_x_axis_accel").as_double();
     offset_data_.y_axis_accel = this->get_parameter("offset_y_axis_accel").as_double();
     offset_data_.z_axis_accel = this->get_parameter("offset_z_axis_accel").as_double();
+    bno086_driver_->set_offset_data(offset_data_);
 
     parameter_callback_handle_ = this->add_on_set_parameters_callback(
       std::bind(&MyNode::on_parameter_event, this, std::placeholders::_1));
