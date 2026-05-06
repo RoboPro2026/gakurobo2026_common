@@ -10,5 +10,5 @@
 	url = git@github.com:YDLIDAR/YDLidar-SDK.git
 [submodule "ydlidar_ros2_driver"]
 	path = ydlidar_ros2_driver
-	url = git@github.com:YDLIDAR/ydlidar_ros2_driver.git
+	url = git@github.com:RoboPro2026/ydlidar_ros2_driver.git
 	branch = humble

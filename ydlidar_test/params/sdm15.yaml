@@ -1,19 +1,26 @@
+# 山口が適当に調整したパラメータ。このパラメータだと安定して動く。
+# もしうまく動かなkれば、sample_rateとfrequencyを調整してみるといいかも。
+# ちなみに、sample_rateとfrequencyは何が違うのかはわかっていない。
 # 参考
 # https://github.com/YDLIDAR/ydlidar_ros2_driver/blob/humble/params/sdm15.yaml
 
 ydlidar_ros2_driver_node:
   ros__parameters:
+    # auto_detect_serial_portは、フォーク元のydlidar_ros2_driverでは存在しないパラメータ。
+    # フォーク元では存在しないパラメータが与えられば場合、自分で正しいデバイス名を探しに行くが、
+    # それをされてしまうと、USBが抜けたときに面倒なので、それを防止するパラメータ
+    # デフォルトではauto_detect_serial_portはtrueになっている。
+    auto_detect_serial_port: false
     port: /dev/ttyUSB0
     frame_id: laser_frame
     ignore_array: ""
     baudrate: 460800
-    # baudrate: 115200
     lidar_type: 5
     device_type: 0
     isSingleChannel: false
     intensity: true
     intensity_bit: 8
-    sample_rate: 10
+    sample_rate: 50
     abnormal_check_count: 4
     fixed_resolution: true
     reversion: false
@@ -24,6 +31,9 @@ ydlidar_ros2_driver_node:
     angle_min: -180.0
     range_max: 64.0
     range_min: 0.01
-    frequency: 10.0
+    frequency: 50.0
     invalid_range_is_inf: false
     debug: false
+    # publish_rateは、フォーク元のydlidar_ros2_driverでは存在しないパラメータ。
+    # publish_rateは、レーザースキャンを何Hzでpublishするかを指定する。
+    publish_rate: 50.0
