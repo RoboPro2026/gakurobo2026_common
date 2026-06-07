@@ -151,10 +151,11 @@ public:
           strerror(errno));
       }
     } else if (n == 0) {
-      // VTIME=5(0.5秒)タイムアウト。BNO086は100Hzで送信するため、タイムアウトは断線の可能性がある
-      RCLCPP_WARN_THROTTLE(
-        rclcpp::get_logger(logger_name_), clock_, 1000,
-        "Receive timeout on '%s'. No data for 0.5s. Possible disconnection.", port_name_.c_str());
+      // VTIME=5(0.5秒)タイムアウト。BNO086は100Hzで送信し続けるため、タイムアウトは断線と判断する
+      is_connected_ = false;
+      RCLCPP_ERROR(
+        rclcpp::get_logger(logger_name_),
+        "Serial port '%s' disconnected (timeout). No data for 0.5s.", port_name_.c_str());
     } else {
       ret.resize(n);
       for (int i = 0; i < n; i++) ret[i] = rx_buff[i];

@@ -137,7 +137,7 @@ ros2 param set /bno086_node reconnect_interval_sec 3.0
 | 状況 | レベル | メッセージ例 |
 |---|---|---|
 | 断線検出（EIO等） | ERROR | `Serial port '/dev/ttyACM0' disconnected. errno = 5(Input/output error)` |
-| データなし0.5秒 | WARN | `Receive timeout on '/dev/ttyACM0'. No data for 0.5s. Possible disconnection.` |
+| データなし0.5秒（断線と判断） | ERROR | `Serial port '/dev/ttyACM0' disconnected (timeout). No data for 0.5s.` |
 | 再接続試行 | WARN | `Serial disconnected. Attempting reconnect to '/dev/ttyACM0'... (interval: 1.0s)` |
 | 再接続成功 | INFO | `Reconnected to '/dev/ttyACM0' successfully.` |
 | 再接続失敗（ポートなし） | ERROR | `errno = 2(No such file or directory), port '/dev/ttyACM0' can't open` |
