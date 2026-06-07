@@ -4,9 +4,9 @@
  * @brief bno086のROS 2ノード
  * @version 0.1
  * @date 2025-10-18
- * 
+ *
  * @copyright Copyright (c) 2025
- * 
+ *
  */
 
 #include <chrono>
@@ -24,27 +24,26 @@ class MyNode : public rclcpp::Node
 public:
   MyNode() : Node("bno086_node")
   {
-    // パラメータを宣言
     this->declare_parameter<std::string>("port");
-    // パラメータを取得
-    std::string port_name = this->get_parameter("port").as_string();
+    port_name_ = this->get_parameter("port").as_string();
 
-    RCLCPP_INFO(this->get_logger(), "Connecting to port: %s", port_name.c_str());
+    this->declare_parameter<double>("reconnect_interval_sec", 1.0);
+    reconnect_interval_sec_ = this->get_parameter("reconnect_interval_sec").as_double();
 
-    // 取得したパラメータで初期化
+    RCLCPP_INFO(this->get_logger(), "Connecting to port: %s", port_name_.c_str());
+
     try {
-      serial_ = std::make_shared<SerialDriver>(port_name);
-      if (serial_->get_is_initialize_success() == false) {
-        RCLCPP_FATAL(this->get_logger(), "Failed to open port: %s.", port_name.c_str());
+      serial_ = std::make_shared<SerialDriver>(port_name_);
+      if (!serial_->is_connected()) {
+        RCLCPP_FATAL(this->get_logger(), "Failed to open port: %s.", port_name_.c_str());
         rclcpp::shutdown();
-        return;  // コンストラクタが終了すれば main も終了する
+        return;
       }
     } catch (const std::exception & e) {
       RCLCPP_FATAL(
-        this->get_logger(), "Failed to open port: %s. Error: %s", port_name.c_str(), e.what());
-      // rclcpp::shutdown() を呼ぶか、例外を投げて終了させる
+        this->get_logger(), "Failed to open port: %s. Error: %s", port_name_.c_str(), e.what());
       rclcpp::shutdown();
-      return;  // コンストラクタが終了すれば main も終了する
+      return;
     }
 
     bno086_driver_ = std::make_shared<BNO086Driver>(serial_);
@@ -77,12 +76,29 @@ public:
     offset_data_.z_axis_accel = this->get_parameter("offset_z_axis_accel").as_double();
     bno086_driver_->set_offset_data(offset_data_);
 
+    last_reconnect_attempt_ = this->now();
+
     parameter_callback_handle_ = this->add_on_set_parameters_callback(
       std::bind(&MyNode::on_parameter_event, this, std::placeholders::_1));
   }
 
   void timer_callback(void)
   {
+    if (!serial_->is_connected()) {
+      auto now = this->now();
+      if ((now - last_reconnect_attempt_).seconds() >= reconnect_interval_sec_) {
+        RCLCPP_WARN(
+          this->get_logger(),
+          "Serial disconnected. Attempting reconnect to '%s'... (interval: %.1fs)",
+          port_name_.c_str(), reconnect_interval_sec_);
+        last_reconnect_attempt_ = now;
+        if (serial_->reconnect()) {
+          RCLCPP_INFO(this->get_logger(), "Reconnected to '%s' successfully.", port_name_.c_str());
+        }
+      }
+      return;
+    }
+
     bno086_driver_->update();
     auto data = bno086_driver_->get_data();
     bno086_driver_->print(data);
@@ -112,7 +128,11 @@ public:
     rcl_interfaces::msg::SetParametersResult result;
     result.successful = true;
     for (const auto & parameter : parameters) {
-      if (parameter.get_name() == "offset_roll_angle") {
+      if (parameter.get_name() == "reconnect_interval_sec") {
+        reconnect_interval_sec_ = parameter.as_double();
+        RCLCPP_INFO(
+          this->get_logger(), "reconnect_interval_sec set to: %.1f", reconnect_interval_sec_);
+      } else if (parameter.get_name() == "offset_roll_angle") {
         offset_data_.roll_angle += parameter.as_double();
         bno086_driver_->set_offset_data(offset_data_);
         RCLCPP_INFO(this->get_logger(), "offset_roll_angle set to: %f", offset_data_.roll_angle);
@@ -169,6 +189,9 @@ public:
     return result;
   }
 
+  std::string port_name_;
+  double reconnect_interval_sec_;
+  rclcpp::Time last_reconnect_attempt_;
   std::shared_ptr<SerialDriver> serial_;
   std::shared_ptr<BNO086Driver> bno086_driver_;
   rclcpp::TimerBase::SharedPtr timer_publisher_;

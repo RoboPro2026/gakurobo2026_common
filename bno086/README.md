@@ -62,9 +62,19 @@ echo 1 | sudo tee /sys/bus/usb-serial/devices/ttyUSB0/latency_timer
       * **このパラメータは起動時に必ず指定する必要があります**。
       * 例: `"/dev/ttyACM0"`
 
-### 動的に変更可能なパラメータ（オフセット）
+### 動的に変更可能なパラメータ
 
-ノードの実行中に `ros2 param set` コマンドで変更可能なオフセット値です。ロボットの初期位置の設定などに使うことを想定しています。
+ノードの実行中に `ros2 param set` コマンドで変更可能なパラメータです。
+
+#### 再接続設定
+
+  * **`reconnect_interval_sec`** (double、初期値は1.0)
+      * 断線を検出した後、再接続を試みる間隔（秒）。
+      * 断線は `read()` が `EIO` / `ENXIO` などのエラーを返したときに検出されます。
+
+#### オフセット
+
+ロボットの初期位置の設定などに使うことを想定しています。
 
   * `offset_roll_angle` (double、初期値は0.0)
   * `offset_pitch_angle` (double、初期値は0.0)
@@ -108,7 +118,31 @@ ros2 topic echo /bno086/imu/data_raw
 ros2 param set /bno086_node offset_yaw_angle 0.05
 ```
 
-### 例5: C++でIMUデータを購読する（サンプルコード）
+### 例5: 再接続間隔を変更する
+
+起動時に再接続間隔を5秒に設定する場合：
+
+```bash
+ros2 run bno086 bno086_node --ros-args -p port:="/dev/ttyACM0" -p reconnect_interval_sec:=5.0
+```
+
+実行中に変更する場合：
+
+```bash
+ros2 param set /bno086_node reconnect_interval_sec 3.0
+```
+
+### 断線・再接続時のログ
+
+| 状況 | レベル | メッセージ例 |
+|---|---|---|
+| 断線検出（EIO等） | ERROR | `Serial port '/dev/ttyACM0' disconnected. errno = 5(Input/output error)` |
+| データなし0.5秒 | WARN | `Receive timeout on '/dev/ttyACM0'. No data for 0.5s. Possible disconnection.` |
+| 再接続試行 | WARN | `Serial disconnected. Attempting reconnect to '/dev/ttyACM0'... (interval: 1.0s)` |
+| 再接続成功 | INFO | `Reconnected to '/dev/ttyACM0' successfully.` |
+| 再接続失敗（ポートなし） | ERROR | `errno = 2(No such file or directory), port '/dev/ttyACM0' can't open` |
+
+### 例6: C++でIMUデータを購読する（サンプルコード）
 
 `bno086/example/bno086_subscription_node.cpp` は、`/bno086/imu/data_raw` トピックを購読し、受け取ったクォータニオンをRPY（オイラー角）に変換してログに出力するサンプルノードです。
 

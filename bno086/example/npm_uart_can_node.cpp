@@ -125,7 +125,7 @@ public:
     // 取得したパラメータで初期化
     try {
       serial_ = std::make_shared<SerialDriver>(port_name);
-      if (serial_->get_is_initialize_success() == false) {
+      if (!serial_->is_connected()) {
         RCLCPP_FATAL(this->get_logger(), "Failed to open port: %s.", port_name.c_str());
         rclcpp::shutdown();
         return;  // コンストラクタが終了すれば main も終了する
