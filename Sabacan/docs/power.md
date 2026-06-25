@@ -18,6 +18,9 @@ source install/setup.bash
 ros2 run sabacan sabacan_power_node --ros-args -p board_id:=0
 ```
 
+> **補足**
+> - 本ノードは `/to_can_bus` へ CAN フレームを publish し、`/from_can_bus` を subscribe します。CAN ブリッジ（例: socketcan ブリッジ）が別途必要です。
+
 ## 2. パラメータ設定
 
 ノード起動時に、電源基板へ初期パラメータを書き込みます（`power_init()`）。

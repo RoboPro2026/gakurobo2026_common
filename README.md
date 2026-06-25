@@ -18,10 +18,19 @@ git submodule update --init --recursive
 ```
 
 ## CANのセットアップ
-```
+
+### ハードウェア CAN（socket_can / R2 など）
+
+```bash
 sudo ./can_setup.bash
 ros2 launch ros2_socketcan socket_can_bridge.launch.xml interface:=can0
 ```
+
+### Ethernet-CAN ゲートウェイ（eth2can / R1）
+
+R1 では TCP 経由で CAN ゲートウェイに接続する `eth2can_node` を使います。  
+`can_setup.bash` や `socket_can_bridge` は不要です。  
+`r1_bringup.launch.py` から自動的に起動されます。詳細は [eth2can/README.md](eth2can/README.md) を参照してください。
 
 ## YDLIDARをbuild
 1. YDLidar-SDKをビルドする（参考：https://github.com/YDLIDAR/YDLidar-SDK/blob/master/doc/howto/how_to_build_and_install.md）
@@ -58,6 +67,8 @@ source install/setup.bash
 [sabacan_single_controlの使い方(ロボマス制御を扱いやすくするパッケージ)](sabacan_single_control/README.md)
 
 [bno086の使い方](bno086/README.md)
+
+[eth2can（Ethernet-CAN ゲートウェイブリッジ）の使い方](eth2can/README.md)
 
 [単眼Lidar SDM15の使い方、ほかのYDLidarも同様の使い方です](https://nagaokaroboconproject.esa.io/posts/334)
 
